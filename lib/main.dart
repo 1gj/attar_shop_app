@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // تأكد من أنك وضعت ملف google-services.json في مجلد android/app
+  // تأكد من وجود ملف google-services.json في android/app
   await Firebase.initializeApp();
   runApp(const MyApp());
 }
@@ -252,7 +252,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 4. ميزة 2: حساب سعر قائمة
+// 4. ميزة 2: حساب سعر قائمة (تم التعديل لإضافة الاسم)
 // ---------------------------------------------------------------------------
 class QuickOrderCalculator extends StatefulWidget {
   const QuickOrderCalculator({super.key});
@@ -263,23 +263,49 @@ class QuickOrderCalculator extends StatefulWidget {
 
 class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
   List<Map<String, dynamic>> items = [];
+
+  // وحدات التحكم (Controllers)
+  final _nameController = TextEditingController(); // جديد: لاسم المادة
   final _kgPriceController = TextEditingController();
   final _gramsController = TextEditingController();
+
   double _totalPrice = 0;
 
   void _addItem() {
+    String name = _nameController.text;
     double priceKg = double.tryParse(_kgPriceController.text) ?? 0;
     double grams = double.tryParse(_gramsController.text) ?? 0;
 
-    if (priceKg > 0 && grams > 0) {
+    if (name.isNotEmpty && priceKg > 0 && grams > 0) {
       double itemCost = (grams / 1000) * priceKg;
       setState(() {
-        items.add({'priceKg': priceKg, 'grams': grams, 'cost': itemCost});
+        items.add({
+          'name': name,
+          'priceKg': priceKg,
+          'grams': grams,
+          'cost': itemCost,
+        });
         _totalPrice += itemCost;
+
+        // تنظيف الحقول للاستعداد للمادة التالية
+        _nameController.clear();
         _kgPriceController.clear();
         _gramsController.clear();
       });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("يرجى إدخال الاسم والسعر والوزن بشكل صحيح"),
+        ),
+      );
     }
+  }
+
+  void _deleteItem(int index) {
+    setState(() {
+      _totalPrice -= items[index]['cost'];
+      items.removeAt(index);
+    });
   }
 
   @override
@@ -290,13 +316,28 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // الصف الأول: اسم المادة
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: "اسم المادة (مثلاً: كمون)",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.edit),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // الصف الثاني: السعر والوزن بجانب بعض
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _kgPriceController,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "سعر الكيلو"),
+                    decoration: const InputDecoration(
+                      labelText: "سعر الكيلو",
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -306,37 +347,82 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: "الوزن (غرام)",
+                      border: OutlineInputBorder(),
                     ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
+
+            // زر الإضافة
             ElevatedButton.icon(
               onPressed: _addItem,
               icon: const Icon(Icons.add),
               label: const Text("أضف للقائمة"),
-            ),
-            const Divider(),
-            Expanded(
-              child: ListView.builder(
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text("مادة ${index + 1}"),
-                    subtitle: Text(
-                      "${items[index]['grams']} غرام @ ${items[index]['priceKg']} للكيلو",
-                    ),
-                    trailing: Text(
-                      "${items[index]['cost'].toStringAsFixed(0)} د.ع",
-                    ),
-                  );
-                },
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 45),
+                backgroundColor: Colors.teal,
+                foregroundColor: Colors.white,
               ),
             ),
+            const Divider(thickness: 2),
+
+            // القائمة
+            Expanded(
+              child: items.isEmpty
+                  ? const Center(child: Text("القائمة فارغة"))
+                  : ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 5),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              child: Text("${index + 1}"),
+                              backgroundColor: Colors.teal[100],
+                            ),
+                            title: Text(
+                              items[index]['name'],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              "${items[index]['grams']} غرام  (سعر الكيلو: ${items[index]['priceKg']})",
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  "${items[index]['cost'].toStringAsFixed(0)} د.ع",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.teal,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => _deleteItem(index),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+
+            // شريط المجموع
             Container(
               padding: const EdgeInsets.all(20),
-              color: Colors.teal[100],
+              decoration: BoxDecoration(
+                color: Colors.teal[100],
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -347,7 +433,7 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
                   Text(
                     "${_totalPrice.toStringAsFixed(0)} دينار",
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Colors.red,
                     ),
@@ -374,10 +460,10 @@ class MixturesListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     String title = type == 'medical' ? "الخلطات العلاجية" : "خلطات البهارات";
 
-    // الاتصال بـ Firestore
     final Stream<QuerySnapshot> mixturesStream = FirebaseFirestore.instance
         .collection('mixtures')
         .where('type', isEqualTo: type)
+        .orderBy('created_at', descending: true) // ترتيب حسب الأحدث
         .snapshots();
 
     return Scaffold(
@@ -397,7 +483,7 @@ class MixturesListScreen extends StatelessWidget {
         stream: mixturesStream,
         builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
           if (snapshot.hasError) {
-            return const Center(child: Text('حدث خطأ في الاتصال'));
+            return Center(child: Text('حدث خطأ: ${snapshot.error}'));
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -450,9 +536,7 @@ class AddMixtureScreen extends StatefulWidget {
 class _AddMixtureScreenState extends State<AddMixtureScreen> {
   final _nameController = TextEditingController();
   final _instructionsController = TextEditingController();
-
   List<Map<String, dynamic>> _tempIngredients = [];
-
   final _ingNameController = TextEditingController();
   final _ingGramsController = TextEditingController();
   final _ingPriceController = TextEditingController();
@@ -487,12 +571,14 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
       } catch (e) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+        ).showSnackBar(SnackBar(content: Text("خطأ في الحفظ: $e")));
       }
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("يرجى ملء البيانات")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("يرجى ملء الاسم وإضافة مكون واحد على الأقل"),
+        ),
+      );
     }
   }
 
