@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "571456185318",
+    "project_id": "attaraapp",
+    "storage_bucket": "attaraapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:571456185318:android:b198a04c8a95148b6bec27",
+        "android_client_info": {
+          "package_name": "com.example.attar_shop_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLh3XmtDTTMPyFJyA20t2ZKFwJz6fhMmQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
