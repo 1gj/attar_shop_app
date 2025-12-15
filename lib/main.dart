@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // تأكد من وجود ملف google-services.json في android/app
   await Firebase.initializeApp();
   runApp(const MyApp());
 }
@@ -16,11 +15,31 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'تطبيق المحل - أونلاين',
+      title: 'بيت العطار',
       theme: ThemeData(
-        primarySwatch: Colors.teal,
         useMaterial3: true,
-        fontFamily: 'Arial',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF00897B), // لون التيل الأساسي
+          secondary: const Color(0xFFFF8F00), // لون برتقالي للبهارات
+          background: const Color(0xFFF5F5F5),
+        ),
+        fontFamily: 'Segoe UI', // خط نظيف (أو الافتراضي)
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF00897B), width: 2),
+          ),
+        ),
       ),
       home: const LoginPage(),
     );
@@ -28,7 +47,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 1. شاشة تسجيل الدخول
+// 1. شاشة تسجيل الدخول (تصميم جديد)
 // ---------------------------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -47,50 +66,92 @@ class _LoginPageState extends State<LoginPage> {
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('كلمة المرور غير صحيحة')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('كلمة المرور غير صحيحة'),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.teal[50],
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.cloud_sync, size: 80, color: Colors.teal),
-              const SizedBox(height: 20),
-              const Text(
-                "دخول الموظفين (متصل)",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF004D40), Color(0xFF00897B)],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Card(
+              elevation: 10,
+              margin: const EdgeInsets.all(24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 30),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'كلمة المرور',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock),
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.spa, size: 60, color: Color(0xFF00897B)),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "بيت العطار",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF004D40),
+                      ),
+                    ),
+                    const Text(
+                      "بوابة الموظفين",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 32),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        hintText: 'رمز الدخول',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00897B),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          "تسجيل الدخول",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _login,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text("دخول"),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -99,7 +160,7 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 2. الشاشة الرئيسية
+// 2. الشاشة الرئيسية (لوحة تحكم)
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -107,70 +168,116 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text("لوحة التحكم السحابية"),
+        title: const Text(
+          "لوحة التحكم",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         centerTitle: true,
+        backgroundColor: const Color(0xFF00897B),
+        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          children: [
-            _buildMenuCard(
-              context,
-              "حساب الغرامات",
-              Icons.scale,
-              const GramCalculatorPage(),
-            ),
-            _buildMenuCard(
-              context,
-              "حساب سعر قائمة",
-              Icons.calculate,
-              const QuickOrderCalculator(),
-            ),
-            _buildMenuCard(
-              context,
-              "الخلطات العلاجية",
-              Icons.medical_services,
-              const MixturesListScreen(type: 'medical'),
-            ),
-            _buildMenuCard(
-              context,
-              "خلطات البهارات",
-              Icons.soup_kitchen,
-              const MixturesListScreen(type: 'spice'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Widget page,
-  ) {
-    return Card(
-      elevation: 4,
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => page),
-        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 50, color: Colors.teal),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16.0),
+              child: Text(
+                "أدوات الحساب",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
+              ),
             ),
+            Row(
+              children: [
+                Expanded(
+                  child: _DashboardCard(
+                    title: "حاسبة الغرامات",
+                    icon: Icons.scale,
+                    color: Colors.blue.shade600,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const GramCalculatorPage(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DashboardCard(
+                    title: "حاسبة الأسعار",
+                    icon: Icons.calculate,
+                    color: Colors.indigo.shade600,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const QuickOrderCalculator(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16.0),
+              child: Text(
+                "إدارة الخلطات",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _DashboardCard(
+                      title: "الخلطات العلاجية",
+                      subtitle: "الأعشاب والطب البديل",
+                      icon: Icons.medical_services_outlined,
+                      color: const Color(0xFF00897B), // لون الأعشاب
+                      isVertical: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const MixturesListScreen(type: 'medical'),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _DashboardCard(
+                      title: "خلطات البهارات",
+                      subtitle: "توابل ونكهات",
+                      icon: Icons.soup_kitchen_outlined,
+                      color: const Color(0xFFFF8F00), // لون البهارات
+                      isVertical: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const MixturesListScreen(type: 'spice'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -178,8 +285,104 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+class _DashboardCard extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final bool isVertical;
+
+  const _DashboardCard({
+    required this.title,
+    this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.isVertical = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: color.withOpacity(0.1), width: 1),
+        ),
+        child: isVertical
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 32, color: color),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              )
+            : Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, size: 28, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
-// 3. ميزة 1: حساب الغرامات
+// 3. ميزة 1: حساب الغرامات (محسن)
 // ---------------------------------------------------------------------------
 class GramCalculatorPage extends StatefulWidget {
   const GramCalculatorPage({super.key});
@@ -191,7 +394,7 @@ class GramCalculatorPage extends StatefulWidget {
 class _GramCalculatorPageState extends State<GramCalculatorPage> {
   final _pricePerKgController = TextEditingController();
   final _targetPriceController = TextEditingController();
-  String _result = "";
+  String _result = "0";
 
   void _calculate() {
     double pricePerKg = double.tryParse(_pricePerKgController.text) ?? 0;
@@ -199,7 +402,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
     if (pricePerKg > 0) {
       double grams = (targetPrice / pricePerKg) * 1000;
       setState(() {
-        _result = "الكمية المطلوبة:\n ${grams.toStringAsFixed(1)} غرام";
+        _result = grams.toStringAsFixed(0);
       });
     }
   }
@@ -209,7 +412,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
     return Scaffold(
       appBar: AppBar(title: const Text("حاسبة الغرامات")),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             TextField(
@@ -217,32 +420,57 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: "سعر الكيلو (دينار)",
-                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.price_change),
               ),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 16),
             TextField(
               controller: _targetPriceController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: "السعر الذي يريده الزبون",
-                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.monetization_on),
               ),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _calculate,
-              child: const Text("احسب الغرامات"),
-            ),
-            const SizedBox(height: 30),
-            Text(
-              _result,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.teal,
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _calculate,
+                icon: const Icon(Icons.calculate),
+                label: const Text("احسب الكمية"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade600,
+                  foregroundColor: Colors.white,
+                ),
               ),
-              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 46, 153, 230),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    "الكمية المطلوبة",
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "$_result غرام",
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -252,7 +480,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 4. ميزة 2: حساب سعر قائمة (تم التعديل لإضافة الاسم)
+// 4. ميزة 2: حساب سعر قائمة (محسن)
 // ---------------------------------------------------------------------------
 class QuickOrderCalculator extends StatefulWidget {
   const QuickOrderCalculator({super.key});
@@ -263,12 +491,9 @@ class QuickOrderCalculator extends StatefulWidget {
 
 class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
   List<Map<String, dynamic>> items = [];
-
-  // وحدات التحكم (Controllers)
-  final _nameController = TextEditingController(); // جديد: لاسم المادة
+  final _nameController = TextEditingController();
   final _kgPriceController = TextEditingController();
   final _gramsController = TextEditingController();
-
   double _totalPrice = 0;
 
   void _addItem() {
@@ -286,170 +511,178 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
           'cost': itemCost,
         });
         _totalPrice += itemCost;
-
-        // تنظيف الحقول للاستعداد للمادة التالية
         _nameController.clear();
         _kgPriceController.clear();
         _gramsController.clear();
       });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("يرجى إدخال الاسم والسعر والوزن بشكل صحيح"),
-        ),
-      );
     }
-  }
-
-  void _deleteItem(int index) {
-    setState(() {
-      _totalPrice -= items[index]['cost'];
-      items.removeAt(index);
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("حساب سعر خلطة يدوية")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // الصف الأول: اسم المادة
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: "اسم المادة (مثلاً: كمون)",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.edit),
+      appBar: AppBar(title: const Text("قائمة حساب سريع")),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: "المادة (مثلاً: كمون)",
+                        prefixIcon: Icon(Icons.edit),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _kgPriceController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: "سعر الكيلو",
+                              prefixIcon: Icon(Icons.tag),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _gramsController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: "الوزن (غرام)",
+                              prefixIcon: Icon(Icons.scale),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _addItem,
+                        icon: const Icon(Icons.add_circle),
+                        label: const Text("إضافة للقائمة"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 10),
-
-            // الصف الثاني: السعر والوزن بجانب بعض
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _kgPriceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: "سعر الكيلو",
-                      border: OutlineInputBorder(),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: items.length,
+              separatorBuilder: (ctx, i) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.indigo.shade50,
+                      child: Text(
+                        "${index + 1}",
+                        style: TextStyle(color: Colors.indigo.shade800),
+                      ),
+                    ),
+                    title: Text(
+                      items[index]['name'],
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      "${items[index]['grams']} غرام × ${items[index]['priceKg']} د.ع",
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "${items[index]['cost'].toStringAsFixed(0)} د.ع",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _totalPrice -= items[index]['cost'];
+                              items.removeAt(index);
+                            });
+                          },
+                        ),
+                      ],
                     ),
                   ),
+                );
+              },
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _gramsController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: "الوزن (غرام)",
-                      border: OutlineInputBorder(),
-                    ),
+              ],
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "المجموع الكلي:",
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+                Text(
+                  "${_totalPrice.toStringAsFixed(0)} دينار",
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-
-            // زر الإضافة
-            ElevatedButton.icon(
-              onPressed: _addItem,
-              icon: const Icon(Icons.add),
-              label: const Text("أضف للقائمة"),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 45),
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-              ),
-            ),
-            const Divider(thickness: 2),
-
-            // القائمة
-            Expanded(
-              child: items.isEmpty
-                  ? const Center(child: Text("القائمة فارغة"))
-                  : ListView.builder(
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 5),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              child: Text("${index + 1}"),
-                              backgroundColor: Colors.teal[100],
-                            ),
-                            title: Text(
-                              items[index]['name'],
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              "${items[index]['grams']} غرام  (سعر الكيلو: ${items[index]['priceKg']})",
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  "${items[index]['cost'].toStringAsFixed(0)} د.ع",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.teal,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () => _deleteItem(index),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-
-            // شريط المجموع
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.teal[100],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "المجموع الكلي:",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    "${_totalPrice.toStringAsFixed(0)} دينار",
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// 5. ميزة 3 & 4: (FIREBASE) الخلطات السحابية
+// 5. الخلطات (Firebase) - تصميم جديد للبطاقات
 // ---------------------------------------------------------------------------
 
 class MixturesListScreen extends StatelessWidget {
@@ -458,66 +691,162 @@ class MixturesListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String title = type == 'medical' ? "الخلطات العلاجية" : "خلطات البهارات";
-
-    final Stream<QuerySnapshot> mixturesStream = FirebaseFirestore.instance
-        .collection('mixtures')
-        .where('type', isEqualTo: type)
-        .orderBy('created_at', descending: true) // ترتيب حسب الأحدث
-        .snapshots();
+    final bool isMedical = type == 'medical';
+    final Color themeColor = isMedical
+        ? const Color(0xFF00897B)
+        : const Color(0xFFFF8F00);
+    final String title = isMedical ? "الخلطات العلاجية" : "خلطات البهارات";
 
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(title: Text(title)),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AddMixtureScreen(type: type),
-            ),
-          );
-        },
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: themeColor,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text("إضافة خلطة", style: TextStyle(color: Colors.white)),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => AddMixtureScreen(type: type)),
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: mixturesStream,
-        builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (snapshot.hasError) {
+        stream: FirebaseFirestore.instance
+            .collection('mixtures')
+            .where('type', isEqualTo: type)
+            .orderBy('created_at', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError)
             return Center(child: Text('حدث خطأ: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting)
             return const Center(child: CircularProgressIndicator());
-          }
-
           if (snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("لا توجد بيانات، أضف جديد"));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isMedical
+                        ? Icons.medical_services_outlined
+                        : Icons.soup_kitchen_outlined,
+                    size: 80,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "لا توجد خلطات مضافة بعد",
+                    style: TextStyle(color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            );
           }
 
-          return ListView(
-            children: snapshot.data!.docs.map((DocumentSnapshot document) {
-              Map<String, dynamic> data =
-                  document.data()! as Map<String, dynamic>;
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              var data =
+                  snapshot.data!.docs[index].data() as Map<String, dynamic>;
+
+              // حساب السعر الإجمالي للخلطة للعرض في القائمة
+              List<dynamic> ingredients = data['ingredients'] ?? [];
+              double totalPrice = 0;
+              for (var item in ingredients) {
+                totalPrice += (item['grams'] / 1000) * item['price_per_kg'];
+              }
+
               return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: ListTile(
-                  title: Text(
-                    data['name'],
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                elevation: 3,
+                margin: const EdgeInsets.only(bottom: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MixtureDetailScreen(data: data),
+                    ),
                   ),
-                  subtitle: const Text("اضغط لعرض التفاصيل"),
-                  trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MixtureDetailScreen(data: data),
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 80,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [themeColor.withOpacity(0.8), themeColor],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isMedical
+                                    ? Icons.local_hospital
+                                    : Icons.restaurant_menu,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  data['name'],
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  "${ingredients.length} مكونات",
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "التكلفة التقريبية:",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                            Text(
+                              "${totalPrice.toStringAsFixed(0)} دينار",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: themeColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
-            }).toList(),
+            },
           );
         },
       ),
@@ -525,6 +854,182 @@ class MixturesListScreen extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// تفاصيل الخلطة (بتصميم الفاتورة)
+// ---------------------------------------------------------------------------
+class MixtureDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const MixtureDetailScreen({required this.data, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    List<dynamic> ingredients = data['ingredients'] ?? [];
+    double totalPrice = 0;
+    for (var item in ingredients) {
+      totalPrice += (item['grams'] / 1000) * item['price_per_kg'];
+    }
+
+    final bool isMedical = data['type'] == 'medical';
+    final Color themeColor = isMedical
+        ? const Color(0xFF00897B)
+        : const Color(0xFFFF8F00);
+
+    return Scaffold(
+      backgroundColor: themeColor,
+      appBar: AppBar(
+        title: const Text(
+          "تفاصيل الخلطة",
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Column(
+        children: [
+          const SizedBox(height: 10),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 35,
+                            backgroundColor: themeColor.withOpacity(0.1),
+                            child: Icon(
+                              isMedical ? Icons.healing : Icons.soup_kitchen,
+                              size: 35,
+                              color: themeColor,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            data['name'],
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    const Text(
+                      "طريقة الاستخدام:",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        data['instructions'] ?? "لا توجد تعليمات",
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      "المكونات والمقادير:",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...ingredients.map((item) {
+                      double cost =
+                          (item['grams'] / 1000) * item['price_per_kg'];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: Colors.grey.shade200),
+                          ),
+                        ),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            item['name'],
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text(
+                            "${item['grams']} غرام  |  ${item['price_per_kg']} دينار/كغ",
+                          ),
+                          trailing: Text(
+                            "${cost.toStringAsFixed(0)} د.ع",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: themeColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: themeColor.withOpacity(0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "التكلفة النهائية:",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                  Text(
+                    "${totalPrice.toStringAsFixed(0)} دينار",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// شاشة إضافة خلطة (نفس المنطق لكن تصميم أنظف)
+// ---------------------------------------------------------------------------
 class AddMixtureScreen extends StatefulWidget {
   final String type;
   const AddMixtureScreen({required this.type, super.key});
@@ -559,206 +1064,146 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
 
   Future<void> _saveToFirebase() async {
     if (_nameController.text.isNotEmpty && _tempIngredients.isNotEmpty) {
-      try {
-        await FirebaseFirestore.instance.collection('mixtures').add({
-          'name': _nameController.text,
-          'type': widget.type,
-          'instructions': _instructionsController.text,
-          'ingredients': _tempIngredients,
-          'created_at': FieldValue.serverTimestamp(),
-        });
-        if (mounted) Navigator.pop(context);
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("خطأ في الحفظ: $e")));
-      }
+      await FirebaseFirestore.instance.collection('mixtures').add({
+        'name': _nameController.text,
+        'type': widget.type,
+        'instructions': _instructionsController.text,
+        'ingredients': _tempIngredients,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+      if (mounted) Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("يرجى ملء الاسم وإضافة مكون واحد على الأقل"),
-        ),
+        const SnackBar(content: Text("يرجى ملء الاسم وإضافة مكونات")),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    String labelName = widget.type == 'medical'
-        ? "اسم المرض/الخلطة"
-        : "نوع البهار";
+    bool isMedical = widget.type == 'medical';
+    Color color = isMedical ? const Color(0xFF00897B) : const Color(0xFFFF8F00);
+
     return Scaffold(
-      appBar: AppBar(title: Text("إضافة $labelName")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: labelName,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _instructionsController,
-              decoration: const InputDecoration(
-                labelText: "طريقة الاستخدام",
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-            const Divider(height: 30, thickness: 2),
-            const Text(
-              "المكونات",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _ingNameController,
-                    decoration: const InputDecoration(labelText: "المكون"),
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: TextField(
-                    controller: _ingGramsController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "غرام"),
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: TextField(
-                    controller: _ingPriceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: "سعر/كغ"),
-                  ),
-                ),
-              ],
-            ),
-            ElevatedButton(
-              onPressed: _addIngredient,
-              child: const Text("أضف المكون"),
-            ),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _tempIngredients.length,
-              itemBuilder: (context, index) {
-                var item = _tempIngredients[index];
-                return ListTile(
-                  title: Text(item['name']),
-                  subtitle: Text(
-                    "${item['grams']} غرام - ${item['price_per_kg']} دينار/كغ",
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () =>
-                        setState(() => _tempIngredients.removeAt(index)),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saveToFirebase,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text("حفظ في قاعدة البيانات السحابية"),
-            ),
-          ],
-        ),
+      appBar: AppBar(
+        title: Text("إضافة ${isMedical ? 'خلطة علاجية' : 'بهارات'}"),
       ),
-    );
-  }
-}
-
-class MixtureDetailScreen extends StatelessWidget {
-  final Map<String, dynamic> data;
-  const MixtureDetailScreen({required this.data, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    List<dynamic> ingredients = data['ingredients'] ?? [];
-    double totalPrice = 0;
-
-    for (var item in ingredients) {
-      double cost = (item['grams'] / 1000) * item['price_per_kg'];
-      totalPrice += cost;
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: Text(data['name'])),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "طريقة الاستخدام:",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              "بيانات الخلطة الأساسية",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            Text(
-              data['instructions'] ?? "لا توجد تعليمات",
-              style: const TextStyle(fontSize: 16),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: "اسم الخلطة"),
             ),
-            const Divider(),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _instructionsController,
+              decoration: const InputDecoration(labelText: "طريقة الاستخدام"),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 24),
             const Text(
-              "المكونات:",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              "المكونات",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: ingredients.length,
-                itemBuilder: (context, index) {
-                  var item = ingredients[index];
-                  double cost = (item['grams'] / 1000) * item['price_per_kg'];
-                  return Card(
-                    color: Colors.grey[100],
-                    child: ListTile(
-                      title: Text(
-                        item['name'],
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text(
-                        "${item['grams']} غرام  |  ${item['price_per_kg']} دينار/كغ",
-                      ),
-                      trailing: Text("${cost.toStringAsFixed(0)} دينار"),
-                    ),
-                  );
-                },
-              ),
-            ),
+            const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.teal,
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  const Text(
-                    "سعر الخلطة الكلي:",
-                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  TextField(
+                    controller: _ingNameController,
+                    decoration: const InputDecoration(
+                      labelText: "اسم المكون",
+                      prefixIcon: Icon(Icons.grass),
+                    ),
                   ),
-                  Text(
-                    "${totalPrice.toStringAsFixed(0)} دينار",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _ingGramsController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: "الوزن (غ)",
+                            prefixIcon: Icon(Icons.scale),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _ingPriceController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: "سعر/كغ",
+                            prefixIcon: Icon(Icons.price_check),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _addIngredient,
+                      icon: const Icon(Icons.add),
+                      label: const Text("أضف المكون للقائمة"),
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ..._tempIngredients
+                .map(
+                  (item) => Card(
+                    child: ListTile(
+                      title: Text(item['name']),
+                      subtitle: Text(
+                        "${item['grams']}غ - ${item['price_per_kg']}د.ع/كغ",
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.remove_circle,
+                          color: Colors.red,
+                        ),
+                        onPressed: () {
+                          setState(() => _tempIngredients.remove(item));
+                        },
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: _saveToFirebase,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text(
+                  "حفظ الخلطة في قاعدة البيانات",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
