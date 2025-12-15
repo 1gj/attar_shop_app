@@ -413,7 +413,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
       appBar: AppBar(title: const Text("حاسبة الغرامات")),
       body: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
+        child: ListView(
           children: [
             TextField(
               controller: _pricePerKgController,
@@ -450,7 +450,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
             Container(
               padding: const EdgeInsets.all(30),
               decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 46, 153, 230),
+                color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.blue.shade100),
               ),
