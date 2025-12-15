@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// تم استبدال Firestore بـ Realtime Database
+import 'package:firebase_database/firebase_database.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,7 +48,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 1. شاشة تسجيل الدخول (تصميم جديد)
+// 1. شاشة تسجيل الدخول
 // ---------------------------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -382,7 +383,7 @@ class _DashboardCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 3. ميزة 1: حساب الغرامات (محسن)
+// 3. ميزة 1: حساب الغرامات
 // ---------------------------------------------------------------------------
 class GramCalculatorPage extends StatefulWidget {
   const GramCalculatorPage({super.key});
@@ -480,7 +481,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 4. ميزة 2: حساب سعر قائمة (محسن)
+// 4. ميزة 2: حساب سعر قائمة
 // ---------------------------------------------------------------------------
 class QuickOrderCalculator extends StatefulWidget {
   const QuickOrderCalculator({super.key});
@@ -682,7 +683,7 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
 }
 
 // ---------------------------------------------------------------------------
-// 5. الخلطات (Firebase) - تصميم جديد للبطاقات
+// 5. الخلطات (Realtime Database) - تصميم البطاقات
 // ---------------------------------------------------------------------------
 
 class MixturesListScreen extends StatelessWidget {
@@ -709,18 +710,46 @@ class MixturesListScreen extends StatelessWidget {
           MaterialPageRoute(builder: (context) => AddMixtureScreen(type: type)),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('mixtures')
-            .where('type', isEqualTo: type)
-            .orderBy('created_at', descending: true)
-            .snapshots(),
+      // تم التعديل لاستخدام Realtime Database
+      body: StreamBuilder<DatabaseEvent>(
+        // نستعلم عن العقدة "mixtures" ونرتب حسب النوع "type" لنجلب فقط النوع المطلوب
+        stream: FirebaseDatabase.instance
+            .ref('mixtures')
+            .orderByChild('type')
+            .equalTo(type)
+            .onValue,
         builder: (context, snapshot) {
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return Center(child: Text('حدث خطأ: ${snapshot.error}'));
-          if (snapshot.connectionState == ConnectionState.waiting)
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.data!.docs.isEmpty) {
+          }
+
+          // معالجة البيانات من Realtime Database
+          List<Map<String, dynamic>> mixturesList = [];
+
+          if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
+            // البيانات تأتي كـ Map (Key: NodeID, Value: Data)
+            final dataMap =
+                snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+
+            dataMap.forEach((key, value) {
+              final mixture = Map<String, dynamic>.from(value);
+              mixture['key'] = key; // نحفظ مفتاح العقدة لو احتجناه
+              mixturesList.add(mixture);
+            });
+
+            // ترتيب القائمة حسب التاريخ (الأحدث أولاً) محلياً
+            // لأن Realtime DB لا تدعم الترتيب التنازلي المباشر بسهولة مع الفلترة
+            mixturesList.sort((a, b) {
+              int timeA = a['created_at'] ?? 0;
+              int timeB = b['created_at'] ?? 0;
+              return timeB.compareTo(timeA);
+            });
+          }
+
+          if (mixturesList.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -744,16 +773,18 @@ class MixturesListScreen extends StatelessWidget {
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: snapshot.data!.docs.length,
+            itemCount: mixturesList.length,
             itemBuilder: (context, index) {
-              var data =
-                  snapshot.data!.docs[index].data() as Map<String, dynamic>;
+              var data = mixturesList[index];
 
               // حساب السعر الإجمالي للخلطة للعرض في القائمة
               List<dynamic> ingredients = data['ingredients'] ?? [];
               double totalPrice = 0;
               for (var item in ingredients) {
-                totalPrice += (item['grams'] / 1000) * item['price_per_kg'];
+                // قد تأتي الأرقام كـ int أو double من JSON، لذا نستخدم num
+                num g = item['grams'] ?? 0;
+                num p = item['price_per_kg'] ?? 0;
+                totalPrice += (g / 1000) * p;
               }
 
               return Card(
@@ -866,7 +897,9 @@ class MixtureDetailScreen extends StatelessWidget {
     List<dynamic> ingredients = data['ingredients'] ?? [];
     double totalPrice = 0;
     for (var item in ingredients) {
-      totalPrice += (item['grams'] / 1000) * item['price_per_kg'];
+      num g = item['grams'] ?? 0;
+      num p = item['price_per_kg'] ?? 0;
+      totalPrice += (g / 1000) * p;
     }
 
     final bool isMedical = data['type'] == 'medical';
@@ -956,8 +989,9 @@ class MixtureDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     ...ingredients.map((item) {
-                      double cost =
-                          (item['grams'] / 1000) * item['price_per_kg'];
+                      num g = item['grams'] ?? 0;
+                      num p = item['price_per_kg'] ?? 0;
+                      double cost = (g / 1000) * p;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
@@ -971,9 +1005,7 @@ class MixtureDetailScreen extends StatelessWidget {
                             item['name'],
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          subtitle: Text(
-                            "${item['grams']} غرام  |  ${item['price_per_kg']} دينار/كغ",
-                          ),
+                          subtitle: Text("$g غرام  |  $p دينار/كغ"),
                           trailing: Text(
                             "${cost.toStringAsFixed(0)} د.ع",
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1028,7 +1060,7 @@ class MixtureDetailScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة إضافة خلطة (نفس المنطق لكن تصميم أنظف)
+// شاشة إضافة خلطة (Realtime Database)
 // ---------------------------------------------------------------------------
 class AddMixtureScreen extends StatefulWidget {
   final String type;
@@ -1064,14 +1096,28 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
 
   Future<void> _saveToFirebase() async {
     if (_nameController.text.isNotEmpty && _tempIngredients.isNotEmpty) {
-      await FirebaseFirestore.instance.collection('mixtures').add({
-        'name': _nameController.text,
-        'type': widget.type,
-        'instructions': _instructionsController.text,
-        'ingredients': _tempIngredients,
-        'created_at': FieldValue.serverTimestamp(),
-      });
-      if (mounted) Navigator.pop(context);
+      try {
+        // تم التعديل للإضافة في Realtime Database
+        // نستخدم push لإنشاء مفتاح فريد جديد
+        DatabaseReference newRef = FirebaseDatabase.instance
+            .ref('mixtures')
+            .push();
+
+        await newRef.set({
+          'name': _nameController.text,
+          'type': widget.type,
+          'instructions': _instructionsController.text,
+          'ingredients': _tempIngredients,
+          // استخدام ServerValue.timestamp للحصول على الوقت الحالي
+          'created_at': ServerValue.timestamp,
+        });
+
+        if (mounted) Navigator.pop(context);
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("حدث خطأ أثناء الحفظ: $e")));
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("يرجى ملء الاسم وإضافة مكونات")),
