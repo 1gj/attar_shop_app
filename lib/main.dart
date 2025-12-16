@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // للحفظ
 import 'package:url_launcher/url_launcher.dart'; // لفتح الروابط
+import 'package:google_generative_ai/google_generative_ai.dart'; // تأكد من استدعاء المكتبة في الأعلى
 
 // متغير عام لحفظ اسم المستخدم الحالي
 String currentUser = "";
@@ -464,8 +465,8 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 2. الشاشة الرئيسية (مع الحقوق في الأسفل)
+//// ---------------------------------------------------------------------------
+// 2. الشاشة الرئيسية (مع إضافة قسم الذكاء الاصطناعي)
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -631,6 +632,34 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+
+                    // --- بداية الإضافة الجديدة: قسم الذكاء الاصطناعي ---
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        "ذكاء اصطناعي",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    _DashboardCard(
+                      title: "الموسوعة الذكية (Gemini)",
+                      subtitle: "معلومات فورية عن أي عشبة",
+                      icon: Icons.psychology,
+                      color: Colors.purple.shade600,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SmartHerbAssistant(),
+                        ),
+                      ),
+                    ),
+
+                    // --- نهاية الإضافة الجديدة ---
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -783,7 +812,7 @@ class _DashboardCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 3. حاسبة الغرامات
+// 3. حاسبة الغرامات (محدثة: تدعم التحويل العكسي)
 // ---------------------------------------------------------------------------
 class GramCalculatorPage extends StatefulWidget {
   const GramCalculatorPage({super.key});
@@ -793,81 +822,206 @@ class GramCalculatorPage extends StatefulWidget {
 }
 
 class _GramCalculatorPageState extends State<GramCalculatorPage> {
-  final _pricePerKgController = TextEditingController();
+  // للتبويب الأول (حساب الوزن من السعر)
+  final _pricePerKgController1 = TextEditingController();
   final _targetPriceController = TextEditingController();
-  String _result = "0";
+  String _resultWeight = "0";
 
-  void _calculate() {
-    double pricePerKg = double.tryParse(_pricePerKgController.text) ?? 0;
+  // للتبويب الثاني (حساب السعر من الوزن)
+  final _pricePerKgController2 = TextEditingController();
+  final _targetGramsController = TextEditingController();
+  String _resultPrice = "0";
+
+  // دالة حساب الوزن (الموجودة سابقاً)
+  void _calculateWeight() {
+    double pricePerKg = double.tryParse(_pricePerKgController1.text) ?? 0;
     double targetPrice = double.tryParse(_targetPriceController.text) ?? 0;
     if (pricePerKg > 0) {
       double grams = (targetPrice / pricePerKg) * 1000;
       setState(() {
-        _result = grams.toStringAsFixed(0);
+        _resultWeight = grams.toStringAsFixed(0);
+      });
+    }
+  }
+
+  // دالة حساب السعر (الجديدة)
+  void _calculatePrice() {
+    double pricePerKg = double.tryParse(_pricePerKgController2.text) ?? 0;
+    double targetGrams = double.tryParse(_targetGramsController.text) ?? 0;
+    if (pricePerKg > 0) {
+      // المعادلة: (الوزن بالغرام ÷ 1000) × سعر الكيلو
+      double price = (targetGrams / 1000) * pricePerKg;
+      setState(() {
+        _resultPrice = price.toStringAsFixed(0); // إزالة الكسور
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("حاسبة الغرامات")),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ListView(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text("حاسبة الغرامات والأسعار"),
+          bottom: const TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
+            tabs: [
+              Tab(text: "عندي مبلغ (أريد الوزن)"),
+              Tab(text: "عندي وزن (أريد السعر)"),
+            ],
+          ),
+          backgroundColor: Colors.blue.shade600,
+          foregroundColor: Colors.white,
+        ),
+        body: TabBarView(
           children: [
-            TextField(
-              controller: _pricePerKgController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "سعر الكيلو (دينار)",
-                prefixIcon: Icon(Icons.price_change),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _targetPriceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "السعر الذي يريده الزبون",
-                prefixIcon: Icon(Icons.monetization_on),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _calculate,
-                icon: const Icon(Icons.calculate),
-                label: const Text("احسب الكمية"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-            Container(
-              padding: const EdgeInsets.all(30),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.blue.shade100),
-              ),
-              child: Column(
+            // ================= التبويب الأول: حساب الوزن =================
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: ListView(
                 children: [
                   const Text(
-                    "الكمية المطلوبة",
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "$_result غرام",
+                    "أدخل المبلغ الذي يملكه الزبون لتعرف كم غراماً يستحق:",
                     style: TextStyle(
-                      fontSize: 32,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade800,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _pricePerKgController1,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "سعر الكيلو (دينار)",
+                      prefixIcon: Icon(Icons.price_change),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _targetPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "المبلغ المراد الشراء به",
+                      prefixIcon: Icon(Icons.monetization_on),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: _calculateWeight,
+                      icon: const Icon(Icons.scale),
+                      label: const Text("احسب الوزن المستحق"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  Container(
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.blue.shade100),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          "الوزن المطلوب",
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "$_resultWeight غرام",
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ================= التبويب الثاني: حساب السعر (الجديد) =================
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: ListView(
+                children: [
+                  const Text(
+                    "أدخل الوزن المطلوب لتعرف كم يكلف:",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _pricePerKgController2,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "سعر الكيلو (دينار)",
+                      prefixIcon: Icon(Icons.price_change),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _targetGramsController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "الوزن المطلوب (غرام)",
+                      prefixIcon: Icon(Icons.scale),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: _calculatePrice,
+                      icon: const Icon(Icons.calculate),
+                      label: const Text("احسب السعر"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo.shade600,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  Container(
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.indigo.shade100),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          "السعر المطلوب",
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "$_resultPrice دينار",
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.indigo.shade800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -2298,6 +2452,147 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// شاشة المساعد الذكي (Gemini)
+// ---------------------------------------------------------------------------
+
+class SmartHerbAssistant extends StatefulWidget {
+  const SmartHerbAssistant({super.key});
+
+  @override
+  State<SmartHerbAssistant> createState() => _SmartHerbAssistantState();
+}
+
+class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
+  // *** هام: ضع مفتاح API الخاص بك هنا ***
+  final String _apiKey = 'ضع_كود_API_هنا';
+
+  final TextEditingController _controller = TextEditingController();
+  String _resultText = "";
+  bool _isLoading = false;
+
+  Future<void> _askGemini() async {
+    String herbName = _controller.text.trim();
+    if (herbName.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+      _resultText = "";
+    });
+
+    try {
+      // إعداد النموذج
+      final model = GenerativeModel(model: 'gemini-pro', apiKey: _apiKey);
+
+      // صياغة الأمر (Prompt) ليكون خبيراً في العطارة
+      final prompt =
+          '''
+      أنت خبير أعشاب وعطار محترف.
+      سأعطيك اسم عشبة أو مادة، وأريدك أن تعطيني تقريراً مختصراً ومفيداً عنها باللغة العربية يحتوي على:
+      1. الفوائد العلاجة باختصار.
+      2. طريقة الاستخدام الشائعة.
+      3. محاذير الاستخدام (من لا يجب أن يستخدمها).
+      
+      اسم العشبة هو: $herbName
+      ''';
+
+      final content = [Content.text(prompt)];
+      final response = await model.generateContent(content);
+
+      setState(() {
+        _resultText = response.text ?? "لم يتم العثور على معلومات.";
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _resultText = "حدث خطأ في الاتصال: $e\nتأكد من الإنترنت ومفتاح API.";
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("الموسوعة العشبية الذكية"),
+        backgroundColor: Colors.teal.shade700,
+        foregroundColor: Colors.white,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const Text(
+              "اسأل الذكاء الاصطناعي عن أي عشبة",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                labelText: "اسم العشبة (مثلاً: البابونج)",
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.send, color: Colors.teal),
+                  onPressed: _askGemini,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: _resultText.isEmpty
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.eco,
+                                    size: 80,
+                                    color: Colors.teal.shade100,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    "النتيجة ستظهر هنا",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                _resultText,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  height: 1.6,
+                                ),
+                                textAlign:
+                                    TextAlign.right, // لمحاذاة النص العربي
+                              ),
+                      ),
+                    ),
             ),
           ],
         ),
