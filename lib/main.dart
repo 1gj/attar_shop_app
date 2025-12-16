@@ -1,18 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // للحفظ
+import 'package:url_launcher/url_launcher.dart'; // لفتح الروابط
 
-// متغير عام لحفظ اسم المستخدم الحالي لتستخدمه كل الشاشات
+// متغير عام لحفظ اسم المستخدم الحالي
 String currentUser = "";
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(const MyApp());
+
+  // التحقق من وجود مستخدم محفوظ مسبقاً
+  final prefs = await SharedPreferences.getInstance();
+  final savedUser = prefs.getString('saved_user');
+  Widget startScreen = const LoginPage();
+
+  if (savedUser != null && savedUser.isNotEmpty) {
+    currentUser = savedUser;
+    if (savedUser == "مؤمل") {
+      startScreen = const AdminDashboard();
+    } else {
+      startScreen = const HomeScreen();
+    }
+  }
+
+  runApp(MyApp(startScreen: startScreen));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Widget startScreen;
+  const MyApp({required this.startScreen, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +62,13 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LoginPage(),
+      home: startScreen,
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// 1. شاشة تسجيل الدخول (معدلة لتدعم اسم المستخدم والمسؤول)
+// 1. شاشة تسجيل الدخول (مع الحقوق وزر الواتساب)
 // ---------------------------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -77,17 +95,17 @@ class _LoginPageState extends State<LoginPage> {
 
     // 1. التحقق هل هو الحساب الرئيسي (مؤمل)؟
     if (username == "مؤمل" && password == "2002") {
-      currentUser = "مؤمل"; // تعيين المستخدم الحالي
-      setState(() => _isLoading = false);
-      // الذهاب إلى لوحة تحكم الأدمن (الخاصة بمؤمل)
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AdminDashboard()),
-      );
+      await _saveUserSession("مؤمل");
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboard()),
+        );
+      }
       return;
     }
 
-    // 2. التحقق من المستخدمين الآخرين في قاعدة البيانات
+    // 2. التحقق من المستخدمين الآخرين
     try {
       final ref = FirebaseDatabase.instance.ref('accounts/$username');
       final snapshot = await ref.get();
@@ -95,24 +113,31 @@ class _LoginPageState extends State<LoginPage> {
       if (snapshot.exists) {
         final userData = Map<String, dynamic>.from(snapshot.value as Map);
         if (userData['password'].toString() == password) {
-          currentUser = username; // تعيين المستخدم الحالي
-
-          // الانتقال للشاشة الرئيسية للتطبيق
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
+          await _saveUserSession(username);
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+          }
         } else {
           _showMessage("كلمة المرور غير صحيحة", isError: true);
+          setState(() => _isLoading = false);
         }
       } else {
         _showMessage("اسم المستخدم غير موجود", isError: true);
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       _showMessage("حدث خطأ في الاتصال: $e", isError: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _saveUserSession(String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('saved_user', username);
+    currentUser = username;
   }
 
   void _showMessage(String msg, {bool isError = false}) {
@@ -125,10 +150,23 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  // دالة لفتح الواتساب
+  Future<void> _launchWhatsApp() async {
+    // رقم الهاتف بصيغة دولية بدون +
+    const phoneNumber = "9647736860085";
+    final whatsappUrl = Uri.parse("https://wa.me/$phoneNumber");
+    if (await canLaunchUrl(whatsappUrl)) {
+      await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+    } else {
+      _showMessage("تعذر فتح الواتساب", isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -136,77 +174,124 @@ class _LoginPageState extends State<LoginPage> {
             colors: [Color(0xFF004D40), Color(0xFF00897B)],
           ),
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Card(
-              elevation: 10,
-              margin: const EdgeInsets.all(24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.spa, size: 60, color: Color(0xFF00897B)),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "بيت العطار",
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF004D40),
+        child: SingleChildScrollView(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Card(
+                      elevation: 10,
+                      margin: const EdgeInsets.all(24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.spa,
+                              size: 60,
+                              color: Color(0xFF00897B),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              "بيت العطار",
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF004D40),
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            TextField(
+                              controller: _usernameController,
+                              textAlign: TextAlign.center,
+                              decoration: const InputDecoration(
+                                hintText: 'اسم المستخدم',
+                                prefixIcon: Icon(Icons.person),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _passwordController,
+                              obscureText: true,
+                              textAlign: TextAlign.center,
+                              decoration: const InputDecoration(
+                                hintText: 'كلمة المرور',
+                                prefixIcon: Icon(Icons.lock),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _login,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF00897B),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                    : const Text(
+                                        "تسجيل الدخول",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    TextField(
-                      controller: _usernameController,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        hintText: 'اسم المستخدم',
-                        prefixIcon: Icon(Icons.person),
+                  ),
+                ),
+                // --- الحقوق وزر الواتساب في أسفل الشاشة ---
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "جميع الحقوق محفوظة لعطارة بيت العطار\nلطلب حساب المراسلة واتساب",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        hintText: 'كلمة المرور',
-                        prefixIcon: Icon(Icons.lock),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00897B),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: _launchWhatsApp,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.chat, // أيقونة المحادثة بديلة للواتساب
+                            color: Colors.green,
+                            size: 28,
                           ),
                         ),
-                        child: _isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text(
-                                "تسجيل الدخول",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -216,10 +301,22 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة "مؤمل" (Admin) - لإدارة الحسابات أو الدخول للتطبيق
+// شاشة "مؤمل" (Admin)
 // ---------------------------------------------------------------------------
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('saved_user');
+    currentUser = "";
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -231,12 +328,7 @@ class AdminDashboard extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-              );
-            },
+            onPressed: () => _logout(context),
           ),
         ],
       ),
@@ -245,7 +337,6 @@ class AdminDashboard extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // بطاقة الدخول لتطبيقك الخاص
             _DashboardCard(
               title: "الدخول لتطبيقي الخاص",
               subtitle: "إدارة منتجاتي وبياناتي",
@@ -259,7 +350,6 @@ class AdminDashboard extends StatelessWidget {
               },
             ),
             const SizedBox(height: 20),
-            // بطاقة إنشاء حسابات جديدة
             _DashboardCard(
               title: "إدارة المستخدمين",
               subtitle: "إنشاء حسابات للموظفين الجدد",
@@ -282,7 +372,7 @@ class AdminDashboard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة إنشاء مستخدم جديد (خاصة بمؤمل)
+// شاشة إنشاء مستخدم جديد
 // ---------------------------------------------------------------------------
 class CreateUserScreen extends StatefulWidget {
   const CreateUserScreen({super.key});
@@ -308,7 +398,6 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
       return;
     }
 
-    // حفظ المستخدم في قاعدة البيانات في مسار accounts
     await FirebaseDatabase.instance.ref('accounts/$username').set({
       'password': password,
       'created_at': ServerValue.timestamp,
@@ -363,10 +452,22 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// 2. الشاشة الرئيسية
+// 2. الشاشة الرئيسية (مع الحقوق في الأسفل)
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('saved_user');
+    currentUser = "";
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -374,7 +475,7 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text(
-          "لوحة التحكم ($currentUser)", // إظهار اسم المستخدم الحالي
+          "لوحة التحكم ($currentUser)",
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -386,140 +487,164 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              // تسجيل الخروج
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
-              );
-            },
+            onPressed: () => _logout(context),
           ),
         ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8.0),
-                child: Text(
-                  "الإدارة العامة",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black54,
-                  ),
-                ),
-              ),
-              _DashboardCard(
-                title: "إدارة كافة المنتجات",
-                subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
-                icon: Icons.settings_applications,
-                color: Colors.red.shade700,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const MixturesListScreen(type: 'all'),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16.0),
-                child: Text(
-                  "أدوات الحساب",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black54,
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _DashboardCard(
-                      title: "حاسبة الغرامات",
-                      icon: Icons.scale,
-                      color: Colors.blue.shade600,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const GramCalculatorPage(),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        "الإدارة العامة",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _DashboardCard(
-                      title: "حاسبة الأسعار",
-                      icon: Icons.calculate,
-                      color: Colors.indigo.shade600,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const QuickOrderCalculator(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 16.0),
-                child: Text(
-                  "إضافة وعرض حسب القسم",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black54,
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _DashboardCard(
-                      title: "الخلطات العلاجية",
-                      subtitle: "طب بديل",
-                      icon: Icons.medical_services_outlined,
-                      color: const Color(0xFF00897B),
-                      isVertical: true,
+                    _DashboardCard(
+                      title: "إدارة كافة المنتجات",
+                      subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
+                      icon: Icons.settings_applications,
+                      color: Colors.red.shade700,
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              const MixturesListScreen(type: 'medical'),
+                              const MixturesListScreen(type: 'all'),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        "أدوات الحساب",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DashboardCard(
+                            title: "حاسبة الغرامات",
+                            icon: Icons.scale,
+                            color: Colors.blue.shade600,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const GramCalculatorPage(),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _DashboardCard(
+                            title: "حاسبة الأسعار",
+                            icon: Icons.calculate,
+                            color: Colors.indigo.shade600,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const QuickOrderCalculator(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        "إضافة وعرض حسب القسم",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DashboardCard(
+                            title: "الخلطات العلاجية",
+                            subtitle: "طب بديل",
+                            icon: Icons.medical_services_outlined,
+                            color: const Color(0xFF00897B),
+                            isVertical: true,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const MixturesListScreen(type: 'medical'),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _DashboardCard(
+                            title: "خلطات البهارات",
+                            subtitle: "توابل ونكهات",
+                            icon: Icons.soup_kitchen_outlined,
+                            color: const Color(0xFFFF8F00),
+                            isVertical: true,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const MixturesListScreen(type: 'spice'),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+            // --- الحقوق في أسفل الشاشة الرئيسية ---
+            Container(
+              padding: const EdgeInsets.only(top: 10),
+              width: double.infinity,
+              child: Column(
+                children: const [
+                  Text(
+                    "جميع الحقوق محفوظة لعطارة بيت العطار",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _DashboardCard(
-                      title: "خلطات البهارات",
-                      subtitle: "توابل ونكهات",
-                      icon: Icons.soup_kitchen_outlined,
-                      color: const Color(0xFFFF8F00),
-                      isVertical: true,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const MixturesListScreen(type: 'spice'),
-                        ),
-                      ),
-                    ),
+                  Text(
+                    "تم برمجة التطبيق بواسطة kratossysttems",
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -527,7 +652,7 @@ class HomeScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Widget البطاقات (نفس القديم)
+// Widget البطاقات
 // ---------------------------------------------------------------------------
 class _DashboardCard extends StatelessWidget {
   final String title;
@@ -645,7 +770,7 @@ class _DashboardCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 3. حاسبة الغرامات (نفس القديم)
+// 3. حاسبة الغرامات
 // ---------------------------------------------------------------------------
 class GramCalculatorPage extends StatefulWidget {
   const GramCalculatorPage({super.key});
@@ -743,7 +868,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 4. حاسبة الأسعار السريعة (نفس القديم)
+// 4. حاسبة الأسعار السريعة
 // ---------------------------------------------------------------------------
 class QuickOrderCalculator extends StatefulWidget {
   const QuickOrderCalculator({super.key});
@@ -945,7 +1070,7 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
 }
 
 // ---------------------------------------------------------------------------
-// 5. الخلطات (معدلة للفصل بين قواعد البيانات)
+// 5. الخلطات
 // ---------------------------------------------------------------------------
 class MixturesListScreen extends StatefulWidget {
   final String type;
@@ -972,7 +1097,6 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
           ),
           TextButton(
             onPressed: () {
-              // *** التعديل الجوهري: الحذف من مسار المستخدم الحالي ***
               FirebaseDatabase.instance
                   .ref('users_data/$currentUser/mixtures')
                   .child(key)
@@ -1011,7 +1135,6 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
       title = "خلطات البهارات";
     }
 
-    // *** التعديل الجوهري: القراءة من مسار المستخدم الحالي ***
     Query dbQuery = FirebaseDatabase.instance.ref(
       'users_data/$currentUser/mixtures',
     );
@@ -1272,7 +1395,7 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// تفاصيل الخلطة (نفس القديم)
+// تفاصيل الخلطة
 // ---------------------------------------------------------------------------
 class MixtureDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -1471,7 +1594,7 @@ class MixtureDetailScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// نافذة الحساب المنبثقة (نفس القديم)
+// نافذة الحساب المنبثقة
 // ---------------------------------------------------------------------------
 class MixtureCalculatorModal extends StatefulWidget {
   final List<dynamic> ingredients;
@@ -1756,7 +1879,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
 }
 
 // ---------------------------------------------------------------------------
-// شاشة إضافة خلطة (معدلة للفصل)
+// شاشة إضافة خلطة
 // ---------------------------------------------------------------------------
 class AddMixtureScreen extends StatefulWidget {
   final String type;
@@ -1793,7 +1916,6 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
   Future<void> _saveToFirebase() async {
     if (_nameController.text.isNotEmpty && _tempIngredients.isNotEmpty) {
       try {
-        // *** التعديل الجوهري: الحفظ في مسار المستخدم الحالي ***
         DatabaseReference newRef = FirebaseDatabase.instance
             .ref('users_data/$currentUser/mixtures')
             .push();
@@ -1954,7 +2076,7 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة تعديل خلطة (معدلة للفصل)
+// شاشة تعديل خلطة
 // ---------------------------------------------------------------------------
 class EditMixtureScreen extends StatefulWidget {
   final String mixtureKey;
@@ -2012,7 +2134,6 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
   Future<void> _updateMixture() async {
     if (_nameController.text.isNotEmpty && _tempIngredients.isNotEmpty) {
       try {
-        // *** التعديل الجوهري: التعديل في مسار المستخدم الحالي ***
         await FirebaseDatabase.instance
             .ref('users_data/$currentUser/mixtures')
             .child(widget.mixtureKey)
