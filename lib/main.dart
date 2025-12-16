@@ -150,15 +150,28 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // دالة لفتح الواتساب
+  // دالة لفتح الواتساب (محدثة ومحسنة)
   Future<void> _launchWhatsApp() async {
-    // رقم الهاتف بصيغة دولية بدون +
-    const phoneNumber = "9647736860085";
-    final whatsappUrl = Uri.parse("https://wa.me/$phoneNumber");
-    if (await canLaunchUrl(whatsappUrl)) {
-      await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
-    } else {
-      _showMessage("تعذر فتح الواتساب", isError: true);
+    const phoneNumber = "9647726860085"; // رقم الهاتف
+
+    // محاولة 1: فتح التطبيق مباشرة باستخدام بروتوكول واتساب
+    final appUrl = Uri.parse("whatsapp://send?phone=$phoneNumber");
+
+    // محاولة 2: فتح عبر رابط الويب (في حال لم ينجح الأول)
+    final webUrl = Uri.parse("https://wa.me/$phoneNumber");
+
+    try {
+      if (await canLaunchUrl(appUrl)) {
+        await launchUrl(appUrl);
+      } else if (await canLaunchUrl(webUrl)) {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      } else {
+        // محاولة أخيرة: الفتح القسري للرابط
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      // في حال الفشل التام
+      _showMessage("لا يوجد تطبيق واتساب مثبت", isError: true);
     }
   }
 
@@ -264,11 +277,11 @@ class _LoginPageState extends State<LoginPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        "جميع الحقوق محفوظة لعطارة بيت العطار\nلطلب حساب المراسلة واتساب",
+                        "جميع الحقوق محفوظة لعطارة بيت العطار\n للحصول على حساب المراسلة واتساب ",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white70,
-                          fontSize: 12,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
