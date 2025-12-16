@@ -2463,7 +2463,6 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
 // ---------------------------------------------------------------------------
 // شاشة المساعد الذكي (Gemini)
 // ---------------------------------------------------------------------------
-
 class SmartHerbAssistant extends StatefulWidget {
   const SmartHerbAssistant({super.key});
 
@@ -2472,8 +2471,8 @@ class SmartHerbAssistant extends StatefulWidget {
 }
 
 class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
-  // *** هام: ضع مفتاح API الخاص بك هنا ***
-  final String _apiKey = 'ضع_كود_API_هنا';
+  // ✅ تم وضع مفتاح API الخاص بك هنا
+  final String _apiKey = 'AIzaSyAHjPsgrCi7SP2Ph-2i5V34FmxcyEhOTaU';
 
   final TextEditingController _controller = TextEditingController();
   String _resultText = "";
@@ -2513,7 +2512,7 @@ class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
       });
     } catch (e) {
       setState(() {
-        _resultText = "حدث خطأ في الاتصال: $e\nتأكد من الإنترنت ومفتاح API.";
+        _resultText = "حدث خطأ في الاتصال: $e\nتأكد من الإنترنت.";
         _isLoading = false;
       });
     }
