@@ -729,12 +729,21 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
   }
 }
 
+// // ---------------------------------------------------------------------------
+// 5. الخلطات (معدلة: تدعم عرض الكل + الحذف + التعديل + البحث 🔍)
 // ---------------------------------------------------------------------------
-// 5. الخلطات (معدلة: تدعم عرض الكل + الحذف + التعديل)
-// ---------------------------------------------------------------------------
-class MixturesListScreen extends StatelessWidget {
+class MixturesListScreen extends StatefulWidget {
   final String type; // يمكن أن تكون 'medical', 'spice', أو 'all'
   const MixturesListScreen({required this.type, super.key});
+
+  @override
+  State<MixturesListScreen> createState() => _MixturesListScreenState();
+}
+
+class _MixturesListScreenState extends State<MixturesListScreen> {
+  // متغيرات البحث
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
 
   // دالة الحذف
   void _deleteMixture(BuildContext context, String key) {
@@ -761,9 +770,15 @@ class MixturesListScreen extends StatelessWidget {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final bool isAll = type == 'all';
-    final bool isMedical = type == 'medical';
+    final bool isAll = widget.type == 'all';
+    final bool isMedical = widget.type == 'medical';
 
     // تحديد الألوان والعناوين بناءً على النوع
     Color themeColor;
@@ -781,21 +796,53 @@ class MixturesListScreen extends StatelessWidget {
     }
 
     // بناء الاستعلام (Query)
-    // إذا كان النوع "الكل"، لا نستخدم الفلتر، وإلا نستخدم equalTo
     Query dbQuery = FirebaseDatabase.instance.ref('mixtures');
     if (!isAll) {
-      dbQuery = dbQuery.orderByChild('type').equalTo(type);
+      dbQuery = dbQuery.orderByChild('type').equalTo(widget.type);
     }
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text(title),
+        // المنطق الخاص بتبديل العنوان إلى حقل بحث
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: "اكتب اسم الخلطة...",
+                  hintStyle: TextStyle(color: Colors.white70),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  prefixIcon: Icon(Icons.search, color: Colors.white70),
+                ),
+                onChanged: (val) {
+                  setState(() {});
+                },
+              )
+            : Text(title),
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchController.clear();
+                } else {
+                  _isSearching = true;
+                }
+              });
+            },
+          ),
+        ],
       ),
-      // إخفاء زر الإضافة إذا كنا في وضع "الكل" لتجنب الارتباك في تحديد النوع عند الإضافة
-      floatingActionButton: isAll
+      floatingActionButton: (isAll)
           ? null
           : FloatingActionButton.extended(
               backgroundColor: themeColor,
@@ -807,7 +854,7 @@ class MixturesListScreen extends StatelessWidget {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AddMixtureScreen(type: type),
+                  builder: (context) => AddMixtureScreen(type: widget.type),
                 ),
               ),
             ),
@@ -833,12 +880,19 @@ class MixturesListScreen extends StatelessWidget {
               mixturesList.add(mixture);
             });
 
-            // ترتيب حسب التاريخ الأحدث
             mixturesList.sort((a, b) {
               int timeA = a['created_at'] ?? 0;
               int timeB = b['created_at'] ?? 0;
               return timeB.compareTo(timeA);
             });
+
+            if (_searchController.text.isNotEmpty) {
+              mixturesList = mixturesList.where((item) {
+                final name = item['name'].toString().toLowerCase();
+                final search = _searchController.text.toLowerCase();
+                return name.contains(search);
+              }).toList();
+            }
           }
 
           if (mixturesList.isEmpty) {
@@ -847,13 +901,15 @@ class MixturesListScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.inventory_2_outlined,
+                    _isSearching
+                        ? Icons.search_off
+                        : Icons.inventory_2_outlined,
                     size: 80,
                     color: Colors.grey.shade300,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "لا توجد بيانات",
+                    _isSearching ? "لا توجد نتائج مطابقة" : "لا توجد بيانات",
                     style: TextStyle(color: Colors.grey.shade500),
                   ),
                 ],
@@ -862,8 +918,14 @@ class MixturesListScreen extends StatelessWidget {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
             itemCount: mixturesList.length,
+            // تم التصحيح هنا: إزالة التكرار ووضع padding واحد يشمل الهوامش والمساحة السفلية
+            padding: const EdgeInsets.only(
+              bottom: 80, // مساحة للزر العائم
+              top: 16,
+              left: 16,
+              right: 16,
+            ),
             itemBuilder: (context, index) {
               var data = mixturesList[index];
               List<dynamic> ingredients = data['ingredients'] ?? [];
@@ -874,7 +936,6 @@ class MixturesListScreen extends StatelessWidget {
                 totalPrice += (g / 1000) * p;
               }
 
-              // إذا كنا نعرض الكل، نحدد لون البطاقة حسب نوعها
               bool itemIsMedical = data['type'] == 'medical';
               Color itemColor = itemIsMedical
                   ? const Color(0xFF00897B)
@@ -928,7 +989,6 @@ class MixturesListScreen extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              // --- أزرار التعديل والحذف الجديدة ---
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -938,7 +998,6 @@ class MixturesListScreen extends StatelessWidget {
                                       color: Colors.white,
                                     ),
                                     onPressed: () {
-                                      // الانتقال لصفحة التعديل
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
