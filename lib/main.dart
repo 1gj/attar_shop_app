@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+// متغير عام لحفظ اسم المستخدم الحالي لتستخدمه كل الشاشات
+String currentUser = "";
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -47,7 +50,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 1. شاشة تسجيل الدخول
+// 1. شاشة تسجيل الدخول (معدلة لتدعم اسم المستخدم والمسؤول)
 // ---------------------------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -57,23 +60,69 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
-  void _login() {
-    if (_passwordController.text == '1234') {
+  void _login() async {
+    String username = _usernameController.text.trim();
+    String password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      _showMessage("يرجى ملء كافة الحقول", isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // 1. التحقق هل هو الحساب الرئيسي (مؤمل)؟
+    if (username == "مؤمل" && password == "2002") {
+      currentUser = "مؤمل"; // تعيين المستخدم الحالي
+      setState(() => _isLoading = false);
+      // الذهاب إلى لوحة تحكم الأدمن (الخاصة بمؤمل)
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => const AdminDashboard()),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('كلمة المرور غير صحيحة'),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      return;
     }
+
+    // 2. التحقق من المستخدمين الآخرين في قاعدة البيانات
+    try {
+      final ref = FirebaseDatabase.instance.ref('accounts/$username');
+      final snapshot = await ref.get();
+
+      if (snapshot.exists) {
+        final userData = Map<String, dynamic>.from(snapshot.value as Map);
+        if (userData['password'].toString() == password) {
+          currentUser = username; // تعيين المستخدم الحالي
+
+          // الانتقال للشاشة الرئيسية للتطبيق
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          _showMessage("كلمة المرور غير صحيحة", isError: true);
+        }
+      } else {
+        _showMessage("اسم المستخدم غير موجود", isError: true);
+      }
+    } catch (e) {
+      _showMessage("حدث خطأ في الاتصال: $e", isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showMessage(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red.shade400 : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -110,42 +159,49 @@ class _LoginPageState extends State<LoginPage> {
                         color: Color(0xFF004D40),
                       ),
                     ),
-                    const Text(
-                      "بوابة الموظفين",
-                      style: TextStyle(color: Colors.grey),
-                    ),
                     const SizedBox(height: 32),
+                    TextField(
+                      controller: _usernameController,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        hintText: 'اسم المستخدم',
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     TextField(
                       controller: _passwordController,
                       obscureText: true,
                       textAlign: TextAlign.center,
                       decoration: const InputDecoration(
-                        hintText: 'رمز الدخول',
-                        prefixIcon: Icon(Icons.lock_outline),
+                        hintText: 'كلمة المرور',
+                        prefixIcon: Icon(Icons.lock),
                       ),
-                      keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _login,
+                        onPressed: _isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00897B),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          elevation: 2,
                         ),
-                        child: const Text(
-                          "تسجيل الدخول",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                "تسجيل الدخول",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -160,7 +216,154 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 2. الشاشة الرئيسية (معدلة)
+// شاشة "مؤمل" (Admin) - لإدارة الحسابات أو الدخول للتطبيق
+// ---------------------------------------------------------------------------
+class AdminDashboard extends StatelessWidget {
+  const AdminDashboard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("لوحة المدير (مؤمل)"),
+        backgroundColor: Colors.purple.shade800,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            // بطاقة الدخول لتطبيقك الخاص
+            _DashboardCard(
+              title: "الدخول لتطبيقي الخاص",
+              subtitle: "إدارة منتجاتي وبياناتي",
+              icon: Icons.store_mall_directory,
+              color: const Color(0xFF00897B),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            // بطاقة إنشاء حسابات جديدة
+            _DashboardCard(
+              title: "إدارة المستخدمين",
+              subtitle: "إنشاء حسابات للموظفين الجدد",
+              icon: Icons.person_add,
+              color: Colors.purple.shade700,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CreateUserScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// شاشة إنشاء مستخدم جديد (خاصة بمؤمل)
+// ---------------------------------------------------------------------------
+class CreateUserScreen extends StatefulWidget {
+  const CreateUserScreen({super.key});
+
+  @override
+  State<CreateUserScreen> createState() => _CreateUserScreenState();
+}
+
+class _CreateUserScreenState extends State<CreateUserScreen> {
+  final _newUsernameController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+
+  void _createNewUser() async {
+    String username = _newUsernameController.text.trim();
+    String password = _newPasswordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) return;
+
+    if (username == "مؤمل") {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("لا يمكن تكرار اسم المدير")));
+      return;
+    }
+
+    // حفظ المستخدم في قاعدة البيانات في مسار accounts
+    await FirebaseDatabase.instance.ref('accounts/$username').set({
+      'password': password,
+      'created_at': ServerValue.timestamp,
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("تم إنشاء الحساب بنجاح")));
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("إنشاء حساب جديد")),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _newUsernameController,
+              decoration: const InputDecoration(
+                labelText: "اسم المستخدم الجديد",
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _newPasswordController,
+              decoration: const InputDecoration(labelText: "كلمة المرور"),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _createNewUser,
+                icon: const Icon(Icons.save),
+                label: const Text("حفظ الحساب"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple.shade700,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. الشاشة الرئيسية
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -170,13 +373,28 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text(
-          "لوحة التحكم",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        title: Text(
+          "لوحة التحكم ($currentUser)", // إظهار اسم المستخدم الحالي
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         centerTitle: true,
         backgroundColor: const Color(0xFF00897B),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              // تسجيل الخروج
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -184,7 +402,6 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- القسم الجديد: الإدارة الشاملة ---
               const Padding(
                 padding: EdgeInsets.only(bottom: 8.0),
                 child: Text(
@@ -199,19 +416,16 @@ class HomeScreen extends StatelessWidget {
               _DashboardCard(
                 title: "إدارة كافة المنتجات",
                 subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
-                icon: Icons.settings_applications, // أيقونة تعبر عن الإدارة
-                color: Colors.red.shade700, // لون مميز
+                icon: Icons.settings_applications,
+                color: Colors.red.shade700,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    // نرسل النوع 'all' ليجلب كل شيء
                     builder: (context) => const MixturesListScreen(type: 'all'),
                   ),
                 ),
               ),
               const SizedBox(height: 24),
-
-              // --- أدوات الحساب ---
               const Padding(
                 padding: EdgeInsets.only(bottom: 16.0),
                 child: Text(
@@ -255,8 +469,6 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-
-              // --- التصنيفات المنفصلة (كما هي) ---
               const Padding(
                 padding: EdgeInsets.only(bottom: 16.0),
                 child: Text(
@@ -314,6 +526,9 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Widget البطاقات (نفس القديم)
+// ---------------------------------------------------------------------------
 class _DashboardCard extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -430,7 +645,7 @@ class _DashboardCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 3. حاسبة الغرامات
+// 3. حاسبة الغرامات (نفس القديم)
 // ---------------------------------------------------------------------------
 class GramCalculatorPage extends StatefulWidget {
   const GramCalculatorPage({super.key});
@@ -528,7 +743,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 4. حاسبة الأسعار السريعة
+// 4. حاسبة الأسعار السريعة (نفس القديم)
 // ---------------------------------------------------------------------------
 class QuickOrderCalculator extends StatefulWidget {
   const QuickOrderCalculator({super.key});
@@ -729,11 +944,11 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
   }
 }
 
-// // ---------------------------------------------------------------------------
-// 5. الخلطات (معدلة: تدعم عرض الكل + الحذف + التعديل + البحث 🔍)
+// ---------------------------------------------------------------------------
+// 5. الخلطات (معدلة للفصل بين قواعد البيانات)
 // ---------------------------------------------------------------------------
 class MixturesListScreen extends StatefulWidget {
-  final String type; // يمكن أن تكون 'medical', 'spice', أو 'all'
+  final String type;
   const MixturesListScreen({required this.type, super.key});
 
   @override
@@ -741,11 +956,9 @@ class MixturesListScreen extends StatefulWidget {
 }
 
 class _MixturesListScreenState extends State<MixturesListScreen> {
-  // متغيرات البحث
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
 
-  // دالة الحذف
   void _deleteMixture(BuildContext context, String key) {
     showDialog(
       context: context,
@@ -759,7 +972,11 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
           ),
           TextButton(
             onPressed: () {
-              FirebaseDatabase.instance.ref('mixtures').child(key).remove();
+              // *** التعديل الجوهري: الحذف من مسار المستخدم الحالي ***
+              FirebaseDatabase.instance
+                  .ref('users_data/$currentUser/mixtures')
+                  .child(key)
+                  .remove();
               Navigator.of(ctx).pop();
             },
             child: const Text("حذف", style: TextStyle(color: Colors.red)),
@@ -780,7 +997,6 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
     final bool isAll = widget.type == 'all';
     final bool isMedical = widget.type == 'medical';
 
-    // تحديد الألوان والعناوين بناءً على النوع
     Color themeColor;
     String title;
 
@@ -795,8 +1011,11 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
       title = "خلطات البهارات";
     }
 
-    // بناء الاستعلام (Query)
-    Query dbQuery = FirebaseDatabase.instance.ref('mixtures');
+    // *** التعديل الجوهري: القراءة من مسار المستخدم الحالي ***
+    Query dbQuery = FirebaseDatabase.instance.ref(
+      'users_data/$currentUser/mixtures',
+    );
+
     if (!isAll) {
       dbQuery = dbQuery.orderByChild('type').equalTo(widget.type);
     }
@@ -804,7 +1023,6 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        // المنطق الخاص بتبديل العنوان إلى حقل بحث
         title: _isSearching
             ? TextField(
                 controller: _searchController,
@@ -814,10 +1032,6 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
                   hintText: "اكتب اسم الخلطة...",
                   hintStyle: TextStyle(color: Colors.white70),
                   border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  prefixIcon: Icon(Icons.search, color: Colors.white70),
                 ),
                 onChanged: (val) {
                   setState(() {});
@@ -909,7 +1123,9 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _isSearching ? "لا توجد نتائج مطابقة" : "لا توجد بيانات",
+                    _isSearching
+                        ? "لا توجد نتائج مطابقة"
+                        : "لا توجد بيانات لهذا الحساب",
                     style: TextStyle(color: Colors.grey.shade500),
                   ),
                 ],
@@ -919,9 +1135,8 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
 
           return ListView.builder(
             itemCount: mixturesList.length,
-            // تم التصحيح هنا: إزالة التكرار ووضع padding واحد يشمل الهوامش والمساحة السفلية
             padding: const EdgeInsets.only(
-              bottom: 80, // مساحة للزر العائم
+              bottom: 80,
               top: 16,
               left: 16,
               right: 16,
@@ -1057,7 +1272,7 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// تفاصيل الخلطة (مع زر الحاسبة الجديد)
+// تفاصيل الخلطة (نفس القديم)
 // ---------------------------------------------------------------------------
 class MixtureDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -1089,7 +1304,6 @@ class MixtureDetailScreen extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      // --- زر الحاسبة الذكية ---
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           showModalBottomSheet(
@@ -1120,7 +1334,6 @@ class MixtureDetailScreen extends StatelessWidget {
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                // أضفنا مساحة في الأسفل عشان الزر العائم ما يغطي المحتوى
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 80.0),
                   child: Column(
@@ -1258,7 +1471,7 @@ class MixtureDetailScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Widget جديد: النافذة المنبثقة لحاسبة الخلطة (Feature المطلوبة)
+// نافذة الحساب المنبثقة (نفس القديم)
 // ---------------------------------------------------------------------------
 class MixtureCalculatorModal extends StatefulWidget {
   final List<dynamic> ingredients;
@@ -1281,7 +1494,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
   late TabController _tabController;
   final _amountController = TextEditingController();
 
-  // Variables for calculation
   double _baseTotalWeight = 0;
   double _baseTotalPrice = 0;
   List<Map<String, dynamic>> _calculatedIngredients = [];
@@ -1294,7 +1506,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
     _tabController = TabController(length: 2, vsync: this);
     _calculateBaseValues();
 
-    // Listen to changes
     _amountController.addListener(_recalculate);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
@@ -1332,25 +1543,15 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
     List<Map<String, dynamic>> tempList = [];
     double newTotalPrice = 0;
     double newTotalWeight = 0;
-
-    // Mode 0: Input Weight -> Get Price
-    // Mode 1: Input Price -> Get Weight
     bool isWeightMode = _tabController.index == 0;
 
-    // إذا كانت الخلطة فارغة لتجنب القسمة على صفر
     if (_baseTotalWeight == 0) return;
-
-    double ratio = 0; // النسبة المستخدمة للضرب
+    double ratio = 0;
 
     if (isWeightMode) {
-      // المستخدم أدخل وزن، نريد حساب السعر
-      // Ratio = الوزن المطلوب / الوزن الأساسي
       newTotalWeight = inputVal;
       ratio = newTotalWeight / _baseTotalWeight;
     } else {
-      // المستخدم أدخل سعر، نريد حساب الوزن
-      // Price per gram of mixture = _baseTotalPrice / _baseTotalWeight
-      // Target Weight = Target Price / PricePerGram
       double pricePerGram = _baseTotalPrice / _baseTotalWeight;
       if (pricePerGram > 0) {
         newTotalWeight = inputVal / pricePerGram;
@@ -1358,7 +1559,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
       }
     }
 
-    // بناء القائمة الجديدة
     for (var item in widget.ingredients) {
       double originalGrams = double.tryParse(item['grams'].toString()) ?? 0;
       double pricePerKg = double.tryParse(item['price_per_kg'].toString()) ?? 0;
@@ -1367,7 +1567,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
       double newCost = (newGrams / 1000) * pricePerKg;
 
       tempList.add({'name': item['name'], 'grams': newGrams, 'cost': newCost});
-
       newTotalPrice += newCost;
     }
 
@@ -1388,7 +1587,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
       ),
       child: Column(
         children: [
-          // Handle bar
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 12),
             width: 50,
@@ -1398,7 +1596,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-          // Title
           Text(
             "حاسبة: ${widget.mixtureName}",
             style: TextStyle(
@@ -1408,7 +1605,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
             ),
           ),
           const SizedBox(height: 10),
-          // Tabs
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -1433,7 +1629,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
             ),
           ),
           const SizedBox(height: 20),
-          // Input
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: TextField(
@@ -1444,7 +1639,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                     ? "الوزن المطلوب (غرام)"
                     : "السعر المطلوب (دينار)",
                 hintText: _tabController.index == 0
-                    ? "مثلاً: 250" // ربع كيلو
+                    ? "مثلاً: 250"
                     : "مثلاً: 5000",
                 suffixIcon: Icon(
                   _tabController.index == 0
@@ -1459,7 +1654,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
             ),
           ),
           const SizedBox(height: 10),
-          // Summary Header
           if (_calculatedIngredients.isNotEmpty)
             Container(
               padding: const EdgeInsets.all(16),
@@ -1514,7 +1708,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                 ],
               ),
             ),
-          // List
           Expanded(
             child: _calculatedIngredients.isEmpty
                 ? Center(
@@ -1563,7 +1756,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
 }
 
 // ---------------------------------------------------------------------------
-// شاشة إضافة خلطة
+// شاشة إضافة خلطة (معدلة للفصل)
 // ---------------------------------------------------------------------------
 class AddMixtureScreen extends StatefulWidget {
   final String type;
@@ -1600,8 +1793,9 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
   Future<void> _saveToFirebase() async {
     if (_nameController.text.isNotEmpty && _tempIngredients.isNotEmpty) {
       try {
+        // *** التعديل الجوهري: الحفظ في مسار المستخدم الحالي ***
         DatabaseReference newRef = FirebaseDatabase.instance
-            .ref('mixtures')
+            .ref('users_data/$currentUser/mixtures')
             .push();
 
         await newRef.set({
@@ -1760,7 +1954,7 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة تعديل خلطة موجودة (جديدة)
+// شاشة تعديل خلطة (معدلة للفصل)
 // ---------------------------------------------------------------------------
 class EditMixtureScreen extends StatefulWidget {
   final String mixtureKey;
@@ -1781,7 +1975,6 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
   final _instructionsController = TextEditingController();
   List<Map<String, dynamic>> _tempIngredients = [];
 
-  // controllers for new ingredient
   final _ingNameController = TextEditingController();
   final _ingGramsController = TextEditingController();
   final _ingPriceController = TextEditingController();
@@ -1789,12 +1982,10 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
   @override
   void initState() {
     super.initState();
-    // تعبئة البيانات الحالية
     _nameController.text = widget.currentData['name'] ?? '';
     _instructionsController.text = widget.currentData['instructions'] ?? '';
 
     if (widget.currentData['ingredients'] != null) {
-      // نسخ المكونات لقائمة جديدة قابلة للتعديل
       List<dynamic> existing = widget.currentData['ingredients'];
       for (var item in existing) {
         _tempIngredients.add(Map<String, dynamic>.from(item));
@@ -1821,14 +2012,14 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
   Future<void> _updateMixture() async {
     if (_nameController.text.isNotEmpty && _tempIngredients.isNotEmpty) {
       try {
+        // *** التعديل الجوهري: التعديل في مسار المستخدم الحالي ***
         await FirebaseDatabase.instance
-            .ref('mixtures')
+            .ref('users_data/$currentUser/mixtures')
             .child(widget.mixtureKey)
             .update({
               'name': _nameController.text,
               'instructions': _instructionsController.text,
               'ingredients': _tempIngredients,
-              // لا نحدث النوع type ولا تاريخ الإنشاء created_at إلا إذا أردت ذلك
             });
 
         if (mounted) {
@@ -1885,8 +2076,6 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
               "المكونات (يمكنك الحذف والإضافة)",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-
-            // --- قسم إضافة مكون جديد ---
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(16),
@@ -1942,9 +2131,7 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
-            // --- قائمة المكونات الحالية ---
             ..._tempIngredients.map(
               (item) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -1962,7 +2149,6 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
