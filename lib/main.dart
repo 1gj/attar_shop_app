@@ -647,7 +647,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     _DashboardCard(
-                      title: "الموسوعة الذكية (Gemini)",
+                      title: "الموسوعة الذكية للأعشاب  ",
                       subtitle: "معلومات فورية عن أي عشبة",
                       icon: Icons.psychology,
                       color: Colors.purple.shade600,
