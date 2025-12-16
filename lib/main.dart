@@ -19,11 +19,11 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00897B), // لون التيل الأساسي
-          secondary: const Color(0xFFFF8F00), // لون برتقالي للبهارات
+          seedColor: const Color(0xFF00897B),
+          secondary: const Color(0xFFFF8F00),
           background: const Color(0xFFF5F5F5),
         ),
-        fontFamily: 'Segoe UI', // خط نظيف (أو الافتراضي)
+        fontFamily: 'Segoe UI',
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -160,7 +160,7 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 2. الشاشة الرئيسية (لوحة تحكم)
+// 2. الشاشة الرئيسية
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -246,7 +246,7 @@ class HomeScreen extends StatelessWidget {
                       title: "الخلطات العلاجية",
                       subtitle: "الأعشاب والطب البديل",
                       icon: Icons.medical_services_outlined,
-                      color: const Color(0xFF00897B), // لون الأعشاب
+                      color: const Color(0xFF00897B),
                       isVertical: true,
                       onTap: () => Navigator.push(
                         context,
@@ -263,7 +263,7 @@ class HomeScreen extends StatelessWidget {
                       title: "خلطات البهارات",
                       subtitle: "توابل ونكهات",
                       icon: Icons.soup_kitchen_outlined,
-                      color: const Color(0xFFFF8F00), // لون البهارات
+                      color: const Color(0xFFFF8F00),
                       isVertical: true,
                       onTap: () => Navigator.push(
                         context,
@@ -382,7 +382,7 @@ class _DashboardCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 3. ميزة 1: حساب الغرامات
+// 3. حاسبة الغرامات
 // ---------------------------------------------------------------------------
 class GramCalculatorPage extends StatefulWidget {
   const GramCalculatorPage({super.key});
@@ -480,7 +480,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 4. ميزة 2: حساب سعر قائمة
+// 4. حاسبة الأسعار السريعة
 // ---------------------------------------------------------------------------
 class QuickOrderCalculator extends StatefulWidget {
   const QuickOrderCalculator({super.key});
@@ -682,11 +682,10 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
 }
 
 // ---------------------------------------------------------------------------
-// 5. الخلطات (Realtime Database) - تصميم البطاقات
+// 5. الخلطات (Realtime Database)
 // ---------------------------------------------------------------------------
-
 class MixturesListScreen extends StatelessWidget {
-  final String type; // 'medical' or 'spice'
+  final String type;
   const MixturesListScreen({required this.type, super.key});
 
   @override
@@ -709,9 +708,7 @@ class MixturesListScreen extends StatelessWidget {
           MaterialPageRoute(builder: (context) => AddMixtureScreen(type: type)),
         ),
       ),
-      // تم التعديل لاستخدام Realtime Database
       body: StreamBuilder<DatabaseEvent>(
-        // نستعلم عن العقدة "mixtures" ونرتب حسب النوع "type" لنجلب فقط النوع المطلوب
         stream: FirebaseDatabase.instance
             .ref('mixtures')
             .orderByChild('type')
@@ -725,22 +722,18 @@ class MixturesListScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // معالجة البيانات من Realtime Database
           List<Map<String, dynamic>> mixturesList = [];
 
           if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
-            // البيانات تأتي كـ Map (Key: NodeID, Value: Data)
             final dataMap =
                 snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
 
             dataMap.forEach((key, value) {
               final mixture = Map<String, dynamic>.from(value);
-              mixture['key'] = key; // نحفظ مفتاح العقدة لو احتجناه
+              mixture['key'] = key;
               mixturesList.add(mixture);
             });
 
-            // ترتيب القائمة حسب التاريخ (الأحدث أولاً) محلياً
-            // لأن Realtime DB لا تدعم الترتيب التنازلي المباشر بسهولة مع الفلترة
             mixturesList.sort((a, b) {
               int timeA = a['created_at'] ?? 0;
               int timeB = b['created_at'] ?? 0;
@@ -775,12 +768,9 @@ class MixturesListScreen extends StatelessWidget {
             itemCount: mixturesList.length,
             itemBuilder: (context, index) {
               var data = mixturesList[index];
-
-              // حساب السعر الإجمالي للخلطة للعرض في القائمة
               List<dynamic> ingredients = data['ingredients'] ?? [];
               double totalPrice = 0;
               for (var item in ingredients) {
-                // قد تأتي الأرقام كـ int أو double من JSON، لذا نستخدم num
                 num g = item['grams'] ?? 0;
                 num p = item['price_per_kg'] ?? 0;
                 totalPrice += (g / 1000) * p;
@@ -885,7 +875,7 @@ class MixturesListScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// تفاصيل الخلطة (بتصميم الفاتورة)
+// تفاصيل الخلطة (مع زر الحاسبة الجديد)
 // ---------------------------------------------------------------------------
 class MixtureDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -917,6 +907,25 @@ class MixtureDetailScreen extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
+      // --- زر الحاسبة الذكية ---
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => MixtureCalculatorModal(
+              ingredients: ingredients,
+              themeColor: themeColor,
+              mixtureName: data['name'],
+            ),
+          );
+        },
+        backgroundColor: Colors.white,
+        foregroundColor: themeColor,
+        icon: const Icon(Icons.calculate),
+        label: const Text("حاسبة الكميات"),
+      ),
       body: Column(
         children: [
           const SizedBox(height: 10),
@@ -929,90 +938,98 @@ class MixtureDetailScreen extends StatelessWidget {
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Column(
-                        children: [
-                          CircleAvatar(
-                            radius: 35,
-                            backgroundColor: themeColor.withOpacity(0.1),
-                            child: Icon(
-                              isMedical ? Icons.healing : Icons.soup_kitchen,
-                              size: 35,
-                              color: themeColor,
+                // أضفنا مساحة في الأسفل عشان الزر العائم ما يغطي المحتوى
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 80.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 35,
+                              backgroundColor: themeColor.withOpacity(0.1),
+                              child: Icon(
+                                isMedical ? Icons.healing : Icons.soup_kitchen,
+                                size: 35,
+                                color: themeColor,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            data['name'],
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
+                            const SizedBox(height: 12),
+                            Text(
+                              data['name'],
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                    const Text(
-                      "طريقة الاستخدام:",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
+                      const SizedBox(height: 30),
+                      const Text(
+                        "طريقة الاستخدام:",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        data['instructions'] ?? "لا توجد تعليمات",
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      "المكونات والمقادير:",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ...ingredients.map((item) {
-                      num g = item['grams'] ?? 0;
-                      num p = item['price_per_kg'] ?? 0;
-                      double cost = (g / 1000) * p;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(color: Colors.grey.shade200),
-                          ),
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            item['name'],
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text("$g غرام  |  $p دينار/كغ"),
-                          trailing: Text(
-                            "${cost.toStringAsFixed(0)} د.ع",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                        child: Text(
+                          data['instructions'] ?? "لا توجد تعليمات",
+                          style: const TextStyle(fontSize: 16),
                         ),
-                      );
-                    }).toList(),
-                  ],
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        "المكونات والمقادير (الأساسية):",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...ingredients.map((item) {
+                        num g = item['grams'] ?? 0;
+                        num p = item['price_per_kg'] ?? 0;
+                        double cost = (g / 1000) * p;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: Colors.grey.shade200),
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              item['name'],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text("$g غرام  |  $p دينار/كغ"),
+                            trailing: Text(
+                              "${cost.toStringAsFixed(0)} د.ع",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1037,7 +1054,7 @@ class MixtureDetailScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "التكلفة النهائية:",
+                    "التكلفة الأساسية:",
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                   Text(
@@ -1059,7 +1076,312 @@ class MixtureDetailScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة إضافة خلطة (Realtime Database)
+// Widget جديد: النافذة المنبثقة لحاسبة الخلطة (Feature المطلوبة)
+// ---------------------------------------------------------------------------
+class MixtureCalculatorModal extends StatefulWidget {
+  final List<dynamic> ingredients;
+  final Color themeColor;
+  final String mixtureName;
+
+  const MixtureCalculatorModal({
+    required this.ingredients,
+    required this.themeColor,
+    required this.mixtureName,
+    super.key,
+  });
+
+  @override
+  State<MixtureCalculatorModal> createState() => _MixtureCalculatorModalState();
+}
+
+class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final _amountController = TextEditingController();
+
+  // Variables for calculation
+  double _baseTotalWeight = 0;
+  double _baseTotalPrice = 0;
+  List<Map<String, dynamic>> _calculatedIngredients = [];
+  double _calculatedTotalPrice = 0;
+  double _calculatedTotalWeight = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _calculateBaseValues();
+
+    // Listen to changes
+    _amountController.addListener(_recalculate);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      _amountController.clear();
+      setState(() {
+        _calculatedIngredients = [];
+        _calculatedTotalPrice = 0;
+        _calculatedTotalWeight = 0;
+      });
+    });
+  }
+
+  void _calculateBaseValues() {
+    _baseTotalWeight = 0;
+    _baseTotalPrice = 0;
+    for (var item in widget.ingredients) {
+      double g = double.tryParse(item['grams'].toString()) ?? 0;
+      double p = double.tryParse(item['price_per_kg'].toString()) ?? 0;
+      _baseTotalWeight += g;
+      _baseTotalPrice += (g / 1000) * p;
+    }
+  }
+
+  void _recalculate() {
+    double inputVal = double.tryParse(_amountController.text) ?? 0;
+    if (inputVal <= 0) {
+      setState(() {
+        _calculatedIngredients = [];
+        _calculatedTotalPrice = 0;
+        _calculatedTotalWeight = 0;
+      });
+      return;
+    }
+
+    List<Map<String, dynamic>> tempList = [];
+    double newTotalPrice = 0;
+    double newTotalWeight = 0;
+
+    // Mode 0: Input Weight -> Get Price
+    // Mode 1: Input Price -> Get Weight
+    bool isWeightMode = _tabController.index == 0;
+
+    // إذا كانت الخلطة فارغة لتجنب القسمة على صفر
+    if (_baseTotalWeight == 0) return;
+
+    double ratio = 0; // النسبة المستخدمة للضرب
+
+    if (isWeightMode) {
+      // المستخدم أدخل وزن، نريد حساب السعر
+      // Ratio = الوزن المطلوب / الوزن الأساسي
+      newTotalWeight = inputVal;
+      ratio = newTotalWeight / _baseTotalWeight;
+    } else {
+      // المستخدم أدخل سعر، نريد حساب الوزن
+      // Price per gram of mixture = _baseTotalPrice / _baseTotalWeight
+      // Target Weight = Target Price / PricePerGram
+      double pricePerGram = _baseTotalPrice / _baseTotalWeight;
+      if (pricePerGram > 0) {
+        newTotalWeight = inputVal / pricePerGram;
+        ratio = newTotalWeight / _baseTotalWeight;
+      }
+    }
+
+    // بناء القائمة الجديدة
+    for (var item in widget.ingredients) {
+      double originalGrams = double.tryParse(item['grams'].toString()) ?? 0;
+      double pricePerKg = double.tryParse(item['price_per_kg'].toString()) ?? 0;
+
+      double newGrams = originalGrams * ratio;
+      double newCost = (newGrams / 1000) * pricePerKg;
+
+      tempList.add({'name': item['name'], 'grams': newGrams, 'cost': newCost});
+
+      newTotalPrice += newCost;
+    }
+
+    setState(() {
+      _calculatedIngredients = tempList;
+      _calculatedTotalPrice = newTotalPrice;
+      _calculatedTotalWeight = newTotalWeight;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 12),
+            width: 50,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          // Title
+          Text(
+            "حاسبة: ${widget.mixtureName}",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: widget.themeColor,
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Tabs
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: widget.themeColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.grey,
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(text: "أريد وزناً محدداً"),
+                  Tab(text: "أريد سعراً محدداً"),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Input
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: _tabController.index == 0
+                    ? "الوزن المطلوب (غرام)"
+                    : "السعر المطلوب (دينار)",
+                hintText: _tabController.index == 0
+                    ? "مثلاً: 250" // ربع كيلو
+                    : "مثلاً: 5000",
+                suffixIcon: Icon(
+                  _tabController.index == 0
+                      ? Icons.scale
+                      : Icons.monetization_on,
+                  color: widget.themeColor,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Summary Header
+          if (_calculatedIngredients.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              decoration: BoxDecoration(
+                color: widget.themeColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: widget.themeColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "الوزن الصافي",
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      Text(
+                        "${_calculatedTotalWeight.toStringAsFixed(0)} غرام",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: widget.themeColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    height: 30,
+                    width: 1,
+                    color: Colors.grey.withOpacity(0.3),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        "السعر النهائي",
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      Text(
+                        "${_calculatedTotalPrice.toStringAsFixed(0)} د.ع",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: widget.themeColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          // List
+          Expanded(
+            child: _calculatedIngredients.isEmpty
+                ? Center(
+                    child: Text(
+                      "أدخل قيمة لعرض المقادير",
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    itemCount: _calculatedIngredients.length,
+                    itemBuilder: (context, index) {
+                      final item = _calculatedIngredients[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border(
+                            bottom: BorderSide(color: Colors.grey.shade100),
+                          ),
+                        ),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: Text(
+                            item['name'],
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            "${(item['grams'] as double).toStringAsFixed(1)} غرام",
+                            style: TextStyle(color: widget.themeColor),
+                          ),
+                          trailing: Text(
+                            "${(item['cost'] as double).toStringAsFixed(0)} د.ع",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// شاشة إضافة خلطة
 // ---------------------------------------------------------------------------
 class AddMixtureScreen extends StatefulWidget {
   final String type;
@@ -1096,8 +1418,6 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
   Future<void> _saveToFirebase() async {
     if (_nameController.text.isNotEmpty && _tempIngredients.isNotEmpty) {
       try {
-        // تم التعديل للإضافة في Realtime Database
-        // نستخدم push لإنشاء مفتاح فريد جديد
         DatabaseReference newRef = FirebaseDatabase.instance
             .ref('mixtures')
             .push();
@@ -1107,7 +1427,6 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
           'type': widget.type,
           'instructions': _instructionsController.text,
           'ingredients': _tempIngredients,
-          // استخدام ServerValue.timestamp للحصول على الوقت الحالي
           'created_at': ServerValue.timestamp,
         });
 
