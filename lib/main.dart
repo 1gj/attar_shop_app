@@ -1,18 +1,19 @@
+// ==================== 1. منطقة الاستدعاءات (Imports Area) ====================
+// هذه المنطقة يجب أن تكون في أول الملف فقط. ممنوع وضع import في الأسفل.
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // للحفظ
-import 'package:url_launcher/url_launcher.dart'; // لفتح الروابط
-import 'package:google_generative_ai/google_generative_ai.dart'; // تأكد من استدعاء المكتبة في الأعلى
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+// ===========================================================================
 
-// متغير عام لحفظ اسم المستخدم الحالي
 String currentUser = "";
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  // التحقق من وجود مستخدم محفوظ مسبقاً
   final prefs = await SharedPreferences.getInstance();
   final savedUser = prefs.getString('saved_user');
   Widget startScreen = const LoginPage();
@@ -69,7 +70,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 1. شاشة تسجيل الدخول (مع الحقوق وزر الواتساب)
+// شاشة تسجيل الدخول
 // ---------------------------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -94,7 +95,6 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
 
-    // 1. التحقق هل هو الحساب الرئيسي (مؤمل)؟
     if (username == "مؤمل" && password == "2002") {
       await _saveUserSession("مؤمل");
       if (mounted) {
@@ -106,7 +106,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    // 2. التحقق من المستخدمين الآخرين
     try {
       final ref = FirebaseDatabase.instance.ref('accounts/$username');
       final snapshot = await ref.get();
@@ -151,28 +150,19 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // دالة لفتح الواتساب (محدثة ومحسنة)
   Future<void> _launchWhatsApp() async {
-    const phoneNumber = "9647726860085"; // رقم الهاتف
-
-    // محاولة 1: فتح التطبيق مباشرة باستخدام بروتوكول واتساب
+    const phoneNumber = "9647736860085";
     final appUrl = Uri.parse("whatsapp://send?phone=$phoneNumber");
-
-    // محاولة 2: فتح عبر رابط الويب (في حال لم ينجح الأول)
     final webUrl = Uri.parse("https://wa.me/$phoneNumber");
 
     try {
       if (await canLaunchUrl(appUrl)) {
         await launchUrl(appUrl);
-      } else if (await canLaunchUrl(webUrl)) {
-        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
       } else {
-        // محاولة أخيرة: الفتح القسري للرابط
         await launchUrl(webUrl, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      // في حال الفشل التام
-      _showMessage("لا يوجد تطبيق واتساب مثبت", isError: true);
+      _showMessage("تعذر فتح الواتساب", isError: true);
     }
   }
 
@@ -271,18 +261,17 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                // --- الحقوق وزر الواتساب في أسفل الشاشة ---
                 Padding(
                   padding: const EdgeInsets.only(bottom: 20.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        "جميع الحقوق محفوظة لعطارة بيت العطار\n للحصول على حساب المراسلة واتساب ",
+                        "جميع الحقوق محفوظة لعطارة بيت العطار\nلطلب حساب المراسلة واتساب",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white70,
-                          fontSize: 16,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -296,7 +285,7 @@ class _LoginPageState extends State<LoginPage> {
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
-                            Icons.chat, // أيقونة المحادثة بديلة للواتساب
+                            Icons.chat,
                             color: Colors.green,
                             size: 28,
                           ),
@@ -315,7 +304,7 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة "مؤمل" (Admin)
+// شاشة المدير (مؤمل)
 // ---------------------------------------------------------------------------
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -465,8 +454,8 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   }
 }
 
-//// ---------------------------------------------------------------------------
-// 2. الشاشة الرئيسية (مع إضافة قسم الذكاء الاصطناعي)
+// ---------------------------------------------------------------------------
+// الشاشة الرئيسية (HomeScreen)
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -633,7 +622,7 @@ class HomeScreen extends StatelessWidget {
                       ],
                     ),
 
-                    // --- بداية الإضافة الجديدة: قسم الذكاء الاصطناعي ---
+                    // --- قسم الذكاء الاصطناعي ---
                     const SizedBox(height: 24),
                     const Padding(
                       padding: EdgeInsets.only(bottom: 16.0),
@@ -647,7 +636,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     _DashboardCard(
-                      title: "الموسوعة الذكية للأعشاب  ",
+                      title: "الموسوعة الذكية (Gemini)",
                       subtitle: "معلومات فورية عن أي عشبة",
                       icon: Icons.psychology,
                       color: Colors.purple.shade600,
@@ -658,14 +647,11 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                    // --- نهاية الإضافة الجديدة ---
                     const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
-            // --- الحقوق في أسفل الشاشة الرئيسية ---
             Container(
               padding: const EdgeInsets.only(top: 10),
               width: double.infinity,
@@ -694,7 +680,7 @@ class HomeScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Widget البطاقات
+// Widget البطاقات (DashboardCard)
 // ---------------------------------------------------------------------------
 class _DashboardCard extends StatelessWidget {
   final String title;
@@ -812,7 +798,7 @@ class _DashboardCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 3. حاسبة الغرامات (محدثة: تدعم التحويل العكسي)
+// حاسبة الغرامات (Tabs)
 // ---------------------------------------------------------------------------
 class GramCalculatorPage extends StatefulWidget {
   const GramCalculatorPage({super.key});
@@ -822,17 +808,14 @@ class GramCalculatorPage extends StatefulWidget {
 }
 
 class _GramCalculatorPageState extends State<GramCalculatorPage> {
-  // للتبويب الأول (حساب الوزن من السعر)
   final _pricePerKgController1 = TextEditingController();
   final _targetPriceController = TextEditingController();
   String _resultWeight = "0";
 
-  // للتبويب الثاني (حساب السعر من الوزن)
   final _pricePerKgController2 = TextEditingController();
   final _targetGramsController = TextEditingController();
   String _resultPrice = "0";
 
-  // دالة حساب الوزن (الموجودة سابقاً)
   void _calculateWeight() {
     double pricePerKg = double.tryParse(_pricePerKgController1.text) ?? 0;
     double targetPrice = double.tryParse(_targetPriceController.text) ?? 0;
@@ -844,15 +827,13 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
     }
   }
 
-  // دالة حساب السعر (الجديدة)
   void _calculatePrice() {
     double pricePerKg = double.tryParse(_pricePerKgController2.text) ?? 0;
     double targetGrams = double.tryParse(_targetGramsController.text) ?? 0;
     if (pricePerKg > 0) {
-      // المعادلة: (الوزن بالغرام ÷ 1000) × سعر الكيلو
       double price = (targetGrams / 1000) * pricePerKg;
       setState(() {
-        _resultPrice = price.toStringAsFixed(0); // إزالة الكسور
+        _resultPrice = price.toStringAsFixed(0);
       });
     }
   }
@@ -878,7 +859,6 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
         ),
         body: TabBarView(
           children: [
-            // ================= التبويب الأول: حساب الوزن =================
             Padding(
               padding: const EdgeInsets.all(24),
               child: ListView(
@@ -952,8 +932,6 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
                 ],
               ),
             ),
-
-            // ================= التبويب الثاني: حساب السعر (الجديد) =================
             Padding(
               padding: const EdgeInsets.all(24),
               child: ListView(
@@ -1035,7 +1013,7 @@ class _GramCalculatorPageState extends State<GramCalculatorPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 4. حاسبة الأسعار السريعة
+// حاسبة الأسعار السريعة
 // ---------------------------------------------------------------------------
 class QuickOrderCalculator extends StatefulWidget {
   const QuickOrderCalculator({super.key});
@@ -1237,7 +1215,7 @@ class _QuickOrderCalculatorState extends State<QuickOrderCalculator> {
 }
 
 // ---------------------------------------------------------------------------
-// 5. الخلطات
+// شاشات الخلطات (Mixtures)
 // ---------------------------------------------------------------------------
 class MixturesListScreen extends StatefulWidget {
   final String type;
@@ -1561,9 +1539,6 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// تفاصيل الخلطة
-// ---------------------------------------------------------------------------
 class MixtureDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
   const MixtureDetailScreen({required this.data, super.key});
@@ -1760,9 +1735,6 @@ class MixtureDetailScreen extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// نافذة الحساب المنبثقة
-// ---------------------------------------------------------------------------
 class MixtureCalculatorModal extends StatefulWidget {
   final List<dynamic> ingredients;
   final Color themeColor;
@@ -2045,9 +2017,6 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
   }
 }
 
-// ---------------------------------------------------------------------------
-// شاشة إضافة خلطة
-// ---------------------------------------------------------------------------
 class AddMixtureScreen extends StatefulWidget {
   final String type;
   const AddMixtureScreen({required this.type, super.key});
@@ -2242,9 +2211,6 @@ class _AddMixtureScreenState extends State<AddMixtureScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// شاشة تعديل خلطة
-// ---------------------------------------------------------------------------
 class EditMixtureScreen extends StatefulWidget {
   final String mixtureKey;
   final Map<String, dynamic> currentData;
@@ -2460,9 +2426,6 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// شاشة المساعد الذكي (Gemini)
-// ---------------------------------------------------------------------------
 class SmartHerbAssistant extends StatefulWidget {
   const SmartHerbAssistant({super.key});
 
@@ -2471,7 +2434,7 @@ class SmartHerbAssistant extends StatefulWidget {
 }
 
 class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
-  // ✅ تم وضع مفتاح API الخاص بك هنا
+  // مفتاح API الخاص بك
   final String _apiKey = 'AIzaSyAHjPsgrCi7SP2Ph-2i5V34FmxcyEhOTaU';
 
   final TextEditingController _controller = TextEditingController();
@@ -2484,35 +2447,26 @@ class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
 
     setState(() {
       _isLoading = true;
-      _resultText = "";
+      _resultText = "جارٍ الاتصال بـ Gemini...\nيرجى الانتظار...";
     });
 
     try {
-      // إعداد النموذج
-      final model = GenerativeModel(model: 'gemini-pro', apiKey: _apiKey);
+      final model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _apiKey);
 
-      // صياغة الأمر (Prompt) ليكون خبيراً في العطارة
-      final prompt =
-          '''
-      أنت خبير أعشاب وعطار محترف.
-      سأعطيك اسم عشبة أو مادة، وأريدك أن تعطيني تقريراً مختصراً ومفيداً عنها باللغة العربية يحتوي على:
-      1. الفوائد العلاجة باختصار.
-      2. طريقة الاستخدام الشائعة.
-      3. محاذير الاستخدام (من لا يجب أن يستخدمها).
-      
-      اسم العشبة هو: $herbName
-      ''';
-
+      final prompt = 'حدثني باختصار عن عشبة: $herbName';
       final content = [Content.text(prompt)];
+
       final response = await model.generateContent(content);
 
       setState(() {
-        _resultText = response.text ?? "لم يتم العثور على معلومات.";
+        _resultText = response.text ?? "وصل رد فارغ من Google!";
         _isLoading = false;
       });
     } catch (e) {
+      // هنا سنطبع الخطأ الحقيقي على شاشة الهاتف لتقرأه
       setState(() {
-        _resultText = "حدث خطأ في الاتصال: $e\nتأكد من الإنترنت.";
+        _resultText =
+            "⚠️ حدثت مشكلة:\n$e\n\nتأكد من:\n1. الإنترنت يعمل\n2. مفتاح API صحيح\n3. التطبيق يملك صلاحية الإنترنت";
         _isLoading = false;
       });
     }
@@ -2521,30 +2475,17 @@ class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("الموسوعة العشبية الذكية"),
-        backgroundColor: Colors.teal.shade700,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text("الموسوعة العشبية")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text(
-              "اسأل الذكاء الاصطناعي عن أي عشبة",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 16),
             TextField(
               controller: _controller,
               decoration: InputDecoration(
-                labelText: "اسم العشبة (مثلاً: البابونج)",
+                labelText: "اسم العشبة",
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.teal),
+                  icon: const Icon(Icons.send),
                   onPressed: _askGemini,
                 ),
                 border: OutlineInputBorder(
@@ -2554,45 +2495,31 @@ class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: _resultText.isEmpty
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.eco,
-                                    size: 80,
-                                    color: Colors.teal.shade100,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  const Text(
-                                    "النتيجة ستظهر هنا",
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                ],
-                              )
-                            : Text(
-                                _resultText,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  height: 1.6,
-                                ),
-                                textAlign:
-                                    TextAlign.right, // لمحاذاة النص العربي
-                              ),
-                      ),
+              child: SingleChildScrollView(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    _resultText.isEmpty
+                        ? "اكتب اسم العشبة واضغط إرسال"
+                        : _resultText,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: _resultText.startsWith("⚠️")
+                          ? Colors.red
+                          : Colors.black,
                     ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ),
             ),
+            if (_isLoading) const LinearProgressIndicator(),
           ],
         ),
       ),
