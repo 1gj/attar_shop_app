@@ -1295,10 +1295,10 @@ class _MixturesListScreenState extends State<MixturesListScreen> {
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)),
                 decoration: const InputDecoration(
                   hintText: "اكتب اسم الخلطة...",
-                  hintStyle: TextStyle(color: Colors.white70),
+                  hintStyle: TextStyle(color: Color.fromARGB(179, 0, 0, 0)),
                   border: InputBorder.none,
                 ),
                 onChanged: (val) {
@@ -1678,11 +1678,47 @@ class MixtureDetailScreen extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            subtitle: Text("$g غرام  |  $p دينار/كغ"),
-                            trailing: Text(
-                              "${cost.toStringAsFixed(0)} د.ع",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: RichText(
+                                textDirection: TextDirection
+                                    .rtl, // اتجاه النص من اليمين لليسار
+                                text: TextSpan(
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                    fontFamily: 'Roboto',
+                                  ),
+                                  children: [
+                                    // 1. الوزن أولاً (باللون الأزرق)
+                                    TextSpan(
+                                      text: "$p ",
+                                      style: TextStyle(
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const TextSpan(text: "غرام"),
+
+                                    // 2. الفاصل
+                                    const TextSpan(
+                                      text: "   |   ",
+                                      style: TextStyle(color: Colors.grey),
+                                    ),
+
+                                    // 3. السعر ثانياً (باللون الأخضر)
+                                    TextSpan(
+                                      text: "$g ",
+                                      style: TextStyle(
+                                        color: Colors.green[700],
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const TextSpan(text: "دينار/كغ"),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
