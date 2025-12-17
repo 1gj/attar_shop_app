@@ -2426,6 +2426,9 @@ class _EditMixtureScreenState extends State<EditMixtureScreen> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// شاشة المساعد الذكي (Gemini) - النسخة النهائية المحدثة
+// ---------------------------------------------------------------------------
 class SmartHerbAssistant extends StatefulWidget {
   const SmartHerbAssistant({super.key});
 
@@ -2434,8 +2437,8 @@ class SmartHerbAssistant extends StatefulWidget {
 }
 
 class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
-  // مفتاح API الخاص بك
-  final String _apiKey = 'AIzaSyAHjPsgrCi7SP2Ph-2i5V34FmxcyEhOTaU';
+  // 🔴🔴🔴 ضع مفتاحك الجديد هنا 🔴🔴🔴
+  final String _apiKey = 'AIzaSyCY-M5Agoot8sgeIHwEUzyhBA1qDVh5iLA';
 
   final TextEditingController _controller = TextEditingController();
   String _resultText = "";
@@ -2445,28 +2448,43 @@ class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
     String herbName = _controller.text.trim();
     if (herbName.isEmpty) return;
 
+    // إخفاء الكيبورد
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _isLoading = true;
-      _resultText = "جارٍ الاتصال بـ Gemini...\nيرجى الانتظار...";
+      _resultText = "جارٍ استشارة الخبير الذكي...\nيرجى الانتظار...";
     });
 
     try {
+      // ✅ استخدام الموديل الجديد والسريع (gemini-1.5-flash)
       final model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: _apiKey);
 
-      final prompt = 'حدثني باختصار عن عشبة: $herbName';
-      final content = [Content.text(prompt)];
+      // تحسين الأمر (Prompt) للحصول على إجابة عطار محترف
+      final prompt =
+          '''
+      أنت خبير أعشاب وعطار قديم ومحترف.
+      أريد تقريراً مختصراً ومفيداً عن: "$herbName"
+      
+      النقاط المطلوبة:
+      1. الفوائد العلاجية (باختصار).
+      2. طريقة الاستخدام (شاي، دهان، بخور...).
+      3. تحذيرات (من لا يناسبه).
+      
+      تكلم بلهجة واضحة ومبسطة.
+      ''';
 
+      final content = [Content.text(prompt)];
       final response = await model.generateContent(content);
 
       setState(() {
-        _resultText = response.text ?? "وصل رد فارغ من Google!";
+        _resultText = response.text ?? "لم يتم العثور على معلومات.";
         _isLoading = false;
       });
     } catch (e) {
-      // هنا سنطبع الخطأ الحقيقي على شاشة الهاتف لتقرأه
       setState(() {
         _resultText =
-            "⚠️ حدثت مشكلة:\n$e\n\nتأكد من:\n1. الإنترنت يعمل\n2. مفتاح API صحيح\n3. التطبيق يملك صلاحية الإنترنت";
+            "⚠️ حدث خطأ:\n$e\n\nتأكد من:\n1- الإنترنت\n2- تفعيل VPN (لبعض الدول)\n3- مفتاح API";
         _isLoading = false;
       });
     }
@@ -2475,17 +2493,31 @@ class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("الموسوعة العشبية")),
+      appBar: AppBar(
+        title: const Text("الموسوعة العشبية"),
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            const Text(
+              "اسأل عن أي عشبة أو مادة عطارية",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: _controller,
               decoration: InputDecoration(
                 labelText: "اسم العشبة",
+                hintText: "مثلاً: اليانسون",
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.send),
+                  icon: const Icon(Icons.send, color: Colors.teal),
                   onPressed: _askGemini,
                 ),
                 border: OutlineInputBorder(
@@ -2494,32 +2526,40 @@ class _SmartHerbAssistantState extends State<SmartHerbAssistant> {
               ),
             ),
             const SizedBox(height: 20),
+            if (_isLoading) const LinearProgressIndicator(color: Colors.teal),
+            const SizedBox(height: 20),
             Expanded(
               child: SingleChildScrollView(
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.teal.shade100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
                   child: Text(
-                    _resultText.isEmpty
-                        ? "اكتب اسم العشبة واضغط إرسال"
-                        : _resultText,
+                    _resultText.isEmpty ? "النتيجة ستظهر هنا..." : _resultText,
                     style: TextStyle(
                       fontSize: 16,
+                      height: 1.6,
                       color: _resultText.startsWith("⚠️")
                           ? Colors.red
-                          : Colors.black,
+                          : Colors.black87,
                     ),
                     textAlign: TextAlign.right,
+                    textDirection: TextDirection.rtl,
                   ),
                 ),
               ),
             ),
-            if (_isLoading) const LinearProgressIndicator(),
           ],
         ),
       ),
