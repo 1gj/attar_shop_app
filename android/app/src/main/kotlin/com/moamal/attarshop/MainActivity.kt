@@ -1,4 +1,4 @@
-package com.example.attar_shop_app
+package com.moamal.attarshop
 
 import io.flutter.embedding.android.FlutterActivity
 
