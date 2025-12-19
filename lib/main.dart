@@ -340,7 +340,6 @@ class AdminDashboard extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // تأكد أن ويدجت _DashboardCard موجودة في ملفك (في الأسفل)
             _DashboardCard(
               title: "الدخول لتطبيقي الخاص",
               subtitle: "إدارة منتجاتي وبياناتي",
@@ -356,14 +355,14 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 20),
             _DashboardCard(
               title: "إدارة المستخدمين",
-              subtitle: "إنشاء حسابات وتحديد الصلاحيات",
-              icon: Icons.manage_accounts,
+              subtitle: "إنشاء حسابات للموظفين الجدد",
+              icon: Icons.person_add,
               color: Colors.purple.shade700,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ManageUsersScreen(),
+                    builder: (context) => const CreateUserScreen(),
                   ),
                 );
               },
@@ -376,7 +375,7 @@ class AdminDashboard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة إنشاء مستخدم جديد (معدلة لمسار accounts)
+// شاشة إنشاء مستخدم جديد
 // ---------------------------------------------------------------------------
 class CreateUserScreen extends StatefulWidget {
   const CreateUserScreen({super.key});
@@ -388,7 +387,6 @@ class CreateUserScreen extends StatefulWidget {
 class _CreateUserScreenState extends State<CreateUserScreen> {
   final _newUsernameController = TextEditingController();
   final _newPasswordController = TextEditingController();
-  bool _isLoading = false;
 
   void _createNewUser() async {
     String username = _newUsernameController.text.trim();
@@ -396,47 +394,23 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 
     if (username.isEmpty || password.isEmpty) return;
 
-    // التحقق من اسم المدير (تأكد أن دالة _isAdmin موجودة في ملفك أو استخدم الشرط المباشر)
-    if (username.contains("مؤمل") ||
-        username.contains("مءمل") ||
-        username == "2002") {
+    if (username == "مؤمل") {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("لا يمكن تكرار اسم المدير")));
       return;
     }
 
-    setState(() => _isLoading = true);
+    await FirebaseDatabase.instance.ref('accounts/$username').set({
+      'password': password,
+      'created_at': ServerValue.timestamp,
+    });
 
-    try {
-      // ✅ التغيير هنا: الحفظ في accounts مباشرة باستخدام الاسم كمفتاح
-      await FirebaseDatabase.instance.ref('accounts/$username').set({
-        'password': password,
-        'created_at': ServerValue.timestamp,
-        // إضافة هيكل الصلاحيات الافتراضي (الكل مغلق false)
-        'permissions': {
-          'p_manage': false, // إدارة المنتجات
-          'p_calc_gram': false, // حاسبة الغرامات
-          'p_calc_price': false, // حاسبة الأسعار
-          'p_medical': false, // الخلطات العلاجية
-          'p_spices': false, // خلطات البهارات
-          'p_ai': false, // الذكاء الاصطناعي
-        },
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("تم إنشاء الحساب")));
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("تم إنشاء الحساب بنجاح")));
+      Navigator.pop(context);
     }
   }
 
@@ -451,26 +425,22 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
             TextField(
               controller: _newUsernameController,
               decoration: const InputDecoration(
-                labelText: "اسم المستخدم",
-                prefixIcon: Icon(Icons.person),
+                labelText: "اسم المستخدم الجديد",
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _newPasswordController,
-              decoration: const InputDecoration(
-                labelText: "كلمة المرور",
-                prefixIcon: Icon(Icons.lock),
-              ),
+              decoration: const InputDecoration(labelText: "كلمة المرور"),
             ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _createNewUser,
+                onPressed: _createNewUser,
                 icon: const Icon(Icons.save),
-                label: Text(_isLoading ? "جاري الحفظ..." : "حفظ الحساب"),
+                label: const Text("حفظ الحساب"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple.shade700,
                   foregroundColor: Colors.white,
@@ -484,31 +454,47 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   }
 }
 
+/// ---------------------------------------------------------------------------
+// شاشة إدارة الموظفين - (مصححة لتعمل مع accounts)
 // ---------------------------------------------------------------------------
-// شاشة إدارة الموظفين (تقرأ من accounts)
-// ---------------------------------------------------------------------------
-class ManageUsersScreen extends StatefulWidget {
+class ManageUsersScreen extends StatelessWidget {
   const ManageUsersScreen({super.key});
 
-  @override
-  State<ManageUsersScreen> createState() => _ManageUsersScreenState();
-}
-
-class _ManageUsersScreenState extends State<ManageUsersScreen> {
-  // خريطة الصلاحيات وأسمائها
+  // قائمة الصلاحيات
   static final Map<String, String> _permissionsMap = {
     'p_manage': 'إدارة كافة المنتجات',
-    'p_calc_gram': 'حاسبة الغرامات',
-    'p_calc_price': 'حاسبة الأسعار',
+    // 'p_calc_gram': 'حاسبة الغرامات', // أصبحت متاحة للجميع
+    // 'p_calc_price': 'حاسبة الأسعار', // أصبحت متاحة للجميع
     'p_medical': 'الخلطات العلاجية',
     'p_spices': 'خلطات البهارات',
     'p_ai': 'الموسوعة الذكية',
   };
 
-  // حذف المستخدم
-  void _deleteUser(String key) {
-    // شرط الحماية البسيط للمدير
-    if (key.contains("مؤمل") || key.contains("مءمل")) {
+  // ✅ دالة التحقق من المدير
+  bool _isAdmin() {
+    final String user = currentUser.trim();
+    // تأكد أن هذه الأسماء تطابق تماماً طريقة تسجيل دخولك
+    return user == "مؤمل" ||
+        user == "مءمل" ||
+        user == "موءمل" ||
+        user == "2002";
+  }
+
+  // ✅ دالة الحذف (من accounts)
+  void _deleteUser(BuildContext context, String key) {
+    if (!_isAdmin()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "عذراً، المستخدم الحالي ($currentUser) ليس لديه صلاحية الحذف",
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (key.contains("مؤمل") || key.contains("مءمل") || key == "2002") {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("لا يمكن حذف المدير!")));
@@ -527,8 +513,12 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           ),
           TextButton(
             onPressed: () {
-              // ✅ التغيير هنا: الحذف من accounts
-              FirebaseDatabase.instance.ref('accounts/$key').remove();
+              // التصحيح: الحذف من accounts
+              FirebaseDatabase.instance
+                  .ref()
+                  .child('accounts')
+                  .child(key)
+                  .remove();
               Navigator.pop(ctx);
             },
             child: const Text("حذف", style: TextStyle(color: Colors.red)),
@@ -538,29 +528,43 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     );
   }
 
-  // تعديل الصلاحيات
-  void _editPermissions(String key, Map<dynamic, dynamic>? currentData) {
+  // ✅ دالة تعديل الصلاحيات (في accounts)
+  void _editPermissions(
+    BuildContext context,
+    String key,
+    Map<dynamic, dynamic>? currentPermsMap,
+  ) {
+    if (!_isAdmin()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "عذراً، المستخدم الحالي ($currentUser) ليس لديه صلاحية التعديل",
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     Map<String, bool> currentPerms = {};
-    // جلب الصلاحيات القديمة إن وجدت
-    if (currentData != null && currentData['permissions'] != null) {
-      final perms = Map<String, dynamic>.from(currentData['permissions']);
-      perms.forEach((k, v) => currentPerms[k] = v as bool);
+    if (currentPermsMap != null) {
+      currentPermsMap.forEach((k, v) => currentPerms[k] = v as bool);
     }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
+        builder: (context, setState) => AlertDialog(
           title: Text("صلاحيات: $key"),
           content: SingleChildScrollView(
             child: Column(
               children: _permissionsMap.keys.map((pKey) {
                 return CheckboxListTile(
                   title: Text(_permissionsMap[pKey]!),
-                  value: currentPerms[pKey] ?? false, // إذا لم توجد تعتبر false
+                  value: currentPerms[pKey] ?? false,
                   activeColor: Colors.purple,
                   onChanged: (val) {
-                    setStateDialog(() => currentPerms[pKey] = val!);
+                    setState(() => currentPerms[pKey] = val!);
                   },
                 );
               }).toList(),
@@ -569,14 +573,17 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           actions: [
             ElevatedButton(
               onPressed: () {
-                // ✅ التغيير هنا: تحديث الصلاحيات داخل حساب المستخدم
+                // التصحيح: التحديث في accounts
                 FirebaseDatabase.instance
-                    .ref('accounts/$key/permissions')
+                    .ref()
+                    .child('accounts')
+                    .child(key)
+                    .child('permissions')
                     .update(currentPerms);
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("تم تحديث الصلاحيات")),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text("تم الحفظ بنجاح")));
               },
               child: const Text("حفظ"),
             ),
@@ -590,42 +597,66 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("إدارة الموظفين"),
+        title: Text("الإدارة (أنت: $currentUser)"),
         backgroundColor: Colors.purple.shade700,
         foregroundColor: Colors.white,
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.purple,
-        child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (c) => const CreateUserScreen()),
-        ),
-      ),
-      // ✅ التغيير هنا: الاستماع لمسار accounts
+      floatingActionButton: _isAdmin()
+          ? FloatingActionButton(
+              backgroundColor: Colors.purple,
+              child: const Icon(Icons.add, color: Colors.white),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (c) => const CreateUserScreen()),
+              ),
+            )
+          : null,
+      // ✅ التصحيح: الاستماع لـ accounts بدلاً من users
       body: StreamBuilder(
-        stream: FirebaseDatabase.instance.ref('accounts').onValue,
+        stream: FirebaseDatabase.instance.ref().child('accounts').onValue,
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("حدث خطأ"));
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // التحقق من وجود بيانات
           if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-            return const Center(child: Text("لا يوجد موظفين حالياً"));
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, size: 60, color: Colors.grey),
+                  Text("لا يوجد موظفين في (accounts)"),
+                ],
+              ),
+            );
           }
 
           final rawData = snapshot.data!.snapshot.value;
           List<Map<String, dynamic>> usersList = [];
 
-          if (rawData is Map) {
-            rawData.forEach((key, value) {
-              final valMap = Map<String, dynamic>.from(value as Map);
-              // استثناء المدير من القائمة
-              if (!key.contains("مؤمل") && !key.contains("مءمل")) {
-                usersList.add({
-                  "key": key, // الاسم هو المفتاح في حالتك (مثل "بيت")
-                  "password": valMap['password'] ?? "***",
-                  "permissions": valMap['permissions'],
-                });
-              }
-            });
+          try {
+            if (rawData is Map) {
+              rawData.forEach((key, value) {
+                final valMap = Map<String, dynamic>.from(value as Map);
+
+                // إخفاء حساب المدير الحالي من القائمة لمنع الخطأ
+                // (يمكنك إزالة هذا الشرط إذا أردت رؤية اسمك)
+                if (key != "مؤمل" && key != "مءمل" && key != "2002") {
+                  usersList.add({
+                    "key": key, // الاسم هو المفتاح في هيكلية accounts
+                    "password": valMap['password'] ?? "***",
+                    "permissions": valMap['permissions'],
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            return Center(child: Text("خطأ في قراءة البيانات: $e"));
+          }
+
+          if (usersList.isEmpty) {
+            return const Center(child: Text("القائمة فارغة"));
           }
 
           return ListView.builder(
@@ -633,22 +664,34 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
             itemBuilder: (context, index) {
               final user = usersList[index];
               return Card(
-                elevation: 3,
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text(user['key']), // عرض الاسم
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                    child: Icon(Icons.person),
+                  ),
+                  title: Text(
+                    user['key'], // عرض الاسم (المفتاح)
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   subtitle: Text("الرمز: ${user['password']}"),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // زر الصلاحيات
                       IconButton(
                         icon: const Icon(Icons.vpn_key, color: Colors.orange),
-                        onPressed: () => _editPermissions(user['key'], user),
+                        onPressed: () => _editPermissions(
+                          context,
+                          user['key'],
+                          user['permissions'],
+                        ),
                       ),
+                      // زر الحذف
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteUser(user['key']),
+                        onPressed: () => _deleteUser(context, user['key']),
                       ),
                     ],
                   ),
@@ -663,7 +706,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// الشاشة الرئيسية (HomeScreen) - مصححة لتعمل مع accounts
+// الشاشة الرئيسية (HomeScreen) - مع نظام الصلاحيات
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -687,14 +730,8 @@ class HomeScreen extends StatelessWidget {
     String permKey,
     Widget page,
   ) {
-    // المدير العام (مؤمل) لديه صلاحية دائماً
-    if (currentUser.contains("مؤمل") ||
-        currentUser.contains("مءمل") ||
-        currentUser == "2002") {
-      Navigator.push(context, MaterialPageRoute(builder: (c) => page));
-      return;
-    }
-
+    // إذا كانت الصلاحيات غير موجودة أو الصلاحية المحددة true، اسمح بالدخول
+    // ملاحظة: يمكنك جعل الافتراضي false إذا أردت منع الجميع إلا بصلاحية صريحة
     bool isAllowed = false;
     if (permissions != null && permissions[permKey] == true) {
       isAllowed = true;
@@ -705,7 +742,9 @@ class HomeScreen extends StatelessWidget {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("عذراً، للدخول لهذا القسم عليك الاشتراك ومراسلة الدعم"),
+          content: Text(
+            "عذراً،  للدخول لهذا القسم عليك الاشتراك ومراسلة الدعم",
+          ),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 2),
         ),
@@ -715,23 +754,35 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ التصحيح هنا: القراءة من 'accounts' مباشرة باستخدام currentUser كمفتاح
+    // نحتاج للبحث عن المستخدم الحالي لجلب صلاحياته
+    // نستخدم StreamBuilder للاستماع لأي تغيير يجريه المدير فوراً
     return StreamBuilder(
       stream: FirebaseDatabase.instance
           .ref()
-          .child('accounts') // كان users
-          .child(currentUser) // الدخول المباشر للمستخدم
+          .child('users')
+          .orderByChild('name')
+          .equalTo(currentUser)
           .onValue,
       builder: (context, snapshot) {
         // تجهيز متغير الصلاحيات
         Map<dynamic, dynamic>? myPermissions;
 
-        // استخراج الصلاحيات إذا وجدت البيانات
         if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
-          final data = Map<String, dynamic>.from(
-            snapshot.data!.snapshot.value as Map,
-          );
-          myPermissions = data['permissions'];
+          final data = snapshot.data!.snapshot.value;
+          if (data is Map) {
+            // نأخذ أول قيمة لأن البحث بالاسم قد يرجع map بمفتاح واحد
+            final userKey = data.keys.first;
+            final userData = data[userKey];
+            myPermissions = userData['permissions'];
+          } else if (data is List) {
+            // في حالة المصفوفة نبحث عن العنصر غير الفارغ
+            for (var item in data) {
+              if (item != null && item['name'] == currentUser) {
+                myPermissions = item['permissions'];
+                break;
+              }
+            }
+          }
         }
 
         return Scaffold(
@@ -911,7 +962,7 @@ class HomeScreen extends StatelessWidget {
                           const Padding(
                             padding: EdgeInsets.only(bottom: 8.0),
                             child: Text(
-                              "ذكاء اصطناعي",
+                              "قسم الذكاء الصناعي  ",
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -921,7 +972,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           _DashboardCard(
-                            title: "الموسوعة الذكية (Gemini)",
+                            title: "الموسوعة الذكية العشبية ",
                             subtitle: "معلومات فورية عن أي عشبة",
                             icon: Icons.psychology,
                             color: Colors.purple.shade600,
