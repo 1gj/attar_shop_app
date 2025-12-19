@@ -454,259 +454,8 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   }
 }
 
-/// ---------------------------------------------------------------------------
-// شاشة إدارة الموظفين - (مصححة لتعمل مع accounts)
 // ---------------------------------------------------------------------------
-class ManageUsersScreen extends StatelessWidget {
-  const ManageUsersScreen({super.key});
-
-  // قائمة الصلاحيات
-  static final Map<String, String> _permissionsMap = {
-    'p_manage': 'إدارة كافة المنتجات',
-    // 'p_calc_gram': 'حاسبة الغرامات', // أصبحت متاحة للجميع
-    // 'p_calc_price': 'حاسبة الأسعار', // أصبحت متاحة للجميع
-    'p_medical': 'الخلطات العلاجية',
-    'p_spices': 'خلطات البهارات',
-    'p_ai': 'الموسوعة الذكية',
-  };
-
-  // ✅ دالة التحقق من المدير
-  bool _isAdmin() {
-    final String user = currentUser.trim();
-    // تأكد أن هذه الأسماء تطابق تماماً طريقة تسجيل دخولك
-    return user == "مؤمل" ||
-        user == "مءمل" ||
-        user == "موءمل" ||
-        user == "2002";
-  }
-
-  // ✅ دالة الحذف (من accounts)
-  void _deleteUser(BuildContext context, String key) {
-    if (!_isAdmin()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "عذراً، المستخدم الحالي ($currentUser) ليس لديه صلاحية الحذف",
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (key.contains("مؤمل") || key.contains("مءمل") || key == "2002") {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("لا يمكن حذف المدير!")));
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("تأكيد الحذف"),
-        content: Text("حذف الموظف $key؟"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("إلغاء"),
-          ),
-          TextButton(
-            onPressed: () {
-              // التصحيح: الحذف من accounts
-              FirebaseDatabase.instance
-                  .ref()
-                  .child('accounts')
-                  .child(key)
-                  .remove();
-              Navigator.pop(ctx);
-            },
-            child: const Text("حذف", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ دالة تعديل الصلاحيات (في accounts)
-  void _editPermissions(
-    BuildContext context,
-    String key,
-    Map<dynamic, dynamic>? currentPermsMap,
-  ) {
-    if (!_isAdmin()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "عذراً، المستخدم الحالي ($currentUser) ليس لديه صلاحية التعديل",
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    Map<String, bool> currentPerms = {};
-    if (currentPermsMap != null) {
-      currentPermsMap.forEach((k, v) => currentPerms[k] = v as bool);
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text("صلاحيات: $key"),
-          content: SingleChildScrollView(
-            child: Column(
-              children: _permissionsMap.keys.map((pKey) {
-                return CheckboxListTile(
-                  title: Text(_permissionsMap[pKey]!),
-                  value: currentPerms[pKey] ?? false,
-                  activeColor: Colors.purple,
-                  onChanged: (val) {
-                    setState(() => currentPerms[pKey] = val!);
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () {
-                // التصحيح: التحديث في accounts
-                FirebaseDatabase.instance
-                    .ref()
-                    .child('accounts')
-                    .child(key)
-                    .child('permissions')
-                    .update(currentPerms);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text("تم الحفظ بنجاح")));
-              },
-              child: const Text("حفظ"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("الإدارة (أنت: $currentUser)"),
-        backgroundColor: Colors.purple.shade700,
-        foregroundColor: Colors.white,
-      ),
-      floatingActionButton: _isAdmin()
-          ? FloatingActionButton(
-              backgroundColor: Colors.purple,
-              child: const Icon(Icons.add, color: Colors.white),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (c) => const CreateUserScreen()),
-              ),
-            )
-          : null,
-      // ✅ التصحيح: الاستماع لـ accounts بدلاً من users
-      body: StreamBuilder(
-        stream: FirebaseDatabase.instance.ref().child('accounts').onValue,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          // التحقق من وجود بيانات
-          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people_outline, size: 60, color: Colors.grey),
-                  Text("لا يوجد موظفين في (accounts)"),
-                ],
-              ),
-            );
-          }
-
-          final rawData = snapshot.data!.snapshot.value;
-          List<Map<String, dynamic>> usersList = [];
-
-          try {
-            if (rawData is Map) {
-              rawData.forEach((key, value) {
-                final valMap = Map<String, dynamic>.from(value as Map);
-
-                // إخفاء حساب المدير الحالي من القائمة لمنع الخطأ
-                // (يمكنك إزالة هذا الشرط إذا أردت رؤية اسمك)
-                if (key != "مؤمل" && key != "مءمل" && key != "2002") {
-                  usersList.add({
-                    "key": key, // الاسم هو المفتاح في هيكلية accounts
-                    "password": valMap['password'] ?? "***",
-                    "permissions": valMap['permissions'],
-                  });
-                }
-              });
-            }
-          } catch (e) {
-            return Center(child: Text("خطأ في قراءة البيانات: $e"));
-          }
-
-          if (usersList.isEmpty) {
-            return const Center(child: Text("القائمة فارغة"));
-          }
-
-          return ListView.builder(
-            itemCount: usersList.length,
-            itemBuilder: (context, index) {
-              final user = usersList[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Colors.purple,
-                    foregroundColor: Colors.white,
-                    child: Icon(Icons.person),
-                  ),
-                  title: Text(
-                    user['key'], // عرض الاسم (المفتاح)
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text("الرمز: ${user['password']}"),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // زر الصلاحيات
-                      IconButton(
-                        icon: const Icon(Icons.vpn_key, color: Colors.orange),
-                        onPressed: () => _editPermissions(
-                          context,
-                          user['key'],
-                          user['permissions'],
-                        ),
-                      ),
-                      // زر الحذف
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteUser(context, user['key']),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// الشاشة الرئيسية (HomeScreen) - مع نظام الصلاحيات
+// الشاشة الرئيسية (HomeScreen)
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -723,312 +472,213 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
-  // دالة للتحقق من الصلاحية والتوجيه
-  void _checkPermissionAndNavigate(
-    BuildContext context,
-    Map<dynamic, dynamic>? permissions,
-    String permKey,
-    Widget page,
-  ) {
-    // إذا كانت الصلاحيات غير موجودة أو الصلاحية المحددة true، اسمح بالدخول
-    // ملاحظة: يمكنك جعل الافتراضي false إذا أردت منع الجميع إلا بصلاحية صريحة
-    bool isAllowed = false;
-    if (permissions != null && permissions[permKey] == true) {
-      isAllowed = true;
-    }
-
-    if (isAllowed) {
-      Navigator.push(context, MaterialPageRoute(builder: (c) => page));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "عذراً،  للدخول لهذا القسم عليك الاشتراك ومراسلة الدعم",
-          ),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // نحتاج للبحث عن المستخدم الحالي لجلب صلاحياته
-    // نستخدم StreamBuilder للاستماع لأي تغيير يجريه المدير فوراً
-    return StreamBuilder(
-      stream: FirebaseDatabase.instance
-          .ref()
-          .child('users')
-          .orderByChild('name')
-          .equalTo(currentUser)
-          .onValue,
-      builder: (context, snapshot) {
-        // تجهيز متغير الصلاحيات
-        Map<dynamic, dynamic>? myPermissions;
-
-        if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
-          final data = snapshot.data!.snapshot.value;
-          if (data is Map) {
-            // نأخذ أول قيمة لأن البحث بالاسم قد يرجع map بمفتاح واحد
-            final userKey = data.keys.first;
-            final userData = data[userKey];
-            myPermissions = userData['permissions'];
-          } else if (data is List) {
-            // في حالة المصفوفة نبحث عن العنصر غير الفارغ
-            for (var item in data) {
-              if (item != null && item['name'] == currentUser) {
-                myPermissions = item['permissions'];
-                break;
-              }
-            }
-          }
-        }
-
-        return Scaffold(
-          backgroundColor: Colors.grey[100],
-          appBar: AppBar(
-            title: Text(
-              "لوحة التحكم ($currentUser)",
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontFamily: 'Cairo',
-              ),
-            ),
-            centerTitle: true,
-            backgroundColor: const Color(0xFF00897B),
-            elevation: 0,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white),
-                onPressed: () => _logout(context),
-              ),
-            ],
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: Text(
+          "لوحة التحكم ($currentUser)",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // === قسم الإدارة العامة ===
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 8.0),
-                            child: Text(
-                              "الإدارة العامة",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54,
-                                fontFamily: 'Cairo',
-                              ),
-                            ),
-                          ),
-                          _DashboardCard(
-                            title: "إدارة كافة المنتجات",
-                            subtitle: "عرض، تعديل، وحذف",
-                            icon: Icons.settings_applications,
-                            color: Colors.red.shade700,
-                            onTap: () {
-                              _checkPermissionAndNavigate(
-                                context,
-                                myPermissions,
-                                'p_manage',
-                                const MixturesListScreen(type: 'all'),
-                              );
-                            },
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          // === قسم أدوات الحساب ===
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 8.0),
-                            child: Text(
-                              "أدوات الحساب",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54,
-                                fontFamily: 'Cairo',
-                              ),
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _DashboardCard(
-                                  title: "حاسبة الغرامات",
-                                  icon: Icons.scale,
-                                  color: Colors.blue.shade600,
-                                  isVertical: true,
-                                  height: 150,
-                                  onTap: () {
-                                    _checkPermissionAndNavigate(
-                                      context,
-                                      myPermissions,
-                                      'p_calc_gram',
-                                      const GramCalculatorPage(),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _DashboardCard(
-                                  title: "حاسبة الأسعار",
-                                  icon: Icons.calculate,
-                                  color: Colors.indigo.shade600,
-                                  isVertical: true,
-                                  height: 150,
-                                  onTap: () {
-                                    _checkPermissionAndNavigate(
-                                      context,
-                                      myPermissions,
-                                      'p_calc_price',
-                                      const QuickOrderCalculator(),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          // === قسم الأقسام ===
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 8.0),
-                            child: Text(
-                              "إضافة وعرض حسب القسم",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54,
-                                fontFamily: 'Cairo',
-                              ),
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _DashboardCard(
-                                  title: "الخلطات العلاجية",
-                                  subtitle: "طب بديل",
-                                  icon: Icons.medical_services_outlined,
-                                  color: const Color(0xFF00897B),
-                                  isVertical: true,
-                                  height: 150,
-                                  onTap: () {
-                                    _checkPermissionAndNavigate(
-                                      context,
-                                      myPermissions,
-                                      'p_medical',
-                                      const MixturesListScreen(type: 'medical'),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _DashboardCard(
-                                  title: "خلطات البهارات",
-                                  subtitle: "توابل ونكهات",
-                                  icon: Icons.soup_kitchen_outlined,
-                                  color: const Color(0xFFFF8F00),
-                                  isVertical: true,
-                                  height: 150,
-                                  onTap: () {
-                                    _checkPermissionAndNavigate(
-                                      context,
-                                      myPermissions,
-                                      'p_spices',
-                                      const MixturesListScreen(type: 'spice'),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          // === قسم الذكاء الاصطناعي ===
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 8.0),
-                            child: Text(
-                              "قسم الذكاء الصناعي  ",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54,
-                                fontFamily: 'Cairo',
-                              ),
-                            ),
-                          ),
-                          _DashboardCard(
-                            title: "الموسوعة الذكية العشبية ",
-                            subtitle: "معلومات فورية عن أي عشبة",
-                            icon: Icons.psychology,
-                            color: Colors.purple.shade600,
-                            onTap: () {
-                              _checkPermissionAndNavigate(
-                                context,
-                                myPermissions,
-                                'p_ai',
-                                const SmartHerbAssistant(),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                        ],
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF00897B),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => _logout(context),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        "الإدارة العامة",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
                       ),
                     ),
-                  ),
+                    _DashboardCard(
+                      title: "إدارة كافة المنتجات",
+                      subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
+                      icon: Icons.settings_applications,
+                      color: Colors.red.shade700,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const MixturesListScreen(type: 'all'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        "أدوات الحساب",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
 
-                  // === الحقوق ===
-                  Container(
-                    padding: const EdgeInsets.only(top: 10),
-                    width: double.infinity,
-                    child: Column(
-                      children: const [
-                        Text(
-                          "جميع الحقوق محفوظة لعطارة بيت العطار",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                            fontFamily: 'Cairo',
+                    // ✅ التعديل هنا: جعل البطاقات تظهر واحدة تلو الأخرى عمودياً
+                    _DashboardCard(
+                      title: "حاسبة الغرامات",
+                      icon: Icons.scale,
+                      color: Colors.blue.shade600,
+                      // يمكنك إزالة isVertical: true لتصبح الأيقونة بجانب النص
+                      // أو إبقاءها لتكون الأيقونة فوق النص (حسب رغبتك)
+                      // سأجعلها أفقية (أيقونة بجانب النص) لتناسب العرض الكامل
+                      isVertical: false,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const GramCalculatorPage(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12), // مسافة بين البطاقتين
+                    _DashboardCard(
+                      title: "حاسبة الأسعار",
+                      icon: Icons.calculate,
+                      color: Colors.indigo.shade600,
+                      isVertical: false,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const QuickOrderCalculator(),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        "إضافة وعرض حسب القسم",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DashboardCard(
+                            title: "الخلطات العلاجية",
+                            subtitle: "طب بديل",
+                            icon: Icons.medical_services_outlined,
+                            color: const Color(0xFF00897B),
+                            isVertical: true,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const MixturesListScreen(type: 'medical'),
+                              ),
+                            ),
                           ),
                         ),
-                        Text(
-                          "تم برمجة التطبيق بواسطة kratossysttems",
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                            fontFamily: 'Cairo',
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _DashboardCard(
+                            title: "خلطات البهارات",
+                            subtitle: "توابل ونكهات",
+                            icon: Icons.soup_kitchen_outlined,
+                            color: const Color(0xFFFF8F00),
+                            isVertical: true,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const MixturesListScreen(type: 'spice'),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
+
+                    // --- قسم الذكاء الاصطناعي ---
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        "ذكاء اصطناعي",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ),
+                    _DashboardCard(
+                      title: "الموسوعة الذكية (Gemini)",
+                      subtitle: "معلومات فورية عن أي عشبة",
+                      icon: Icons.psychology,
+                      color: Colors.purple.shade600,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SmartHerbAssistant(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.only(top: 10),
+              width: double.infinity,
+              child: Column(
+                children: const [
+                  Text(
+                    "جميع الحقوق محفوظة لعطارة بيت العطار",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  Text(
+                    "تم برمجة التطبيق بواسطة kratossysttems",
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
                   ),
                 ],
               ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// الكلاس المساعد للبطاقات (معدل ليدعم التصميم الجديد)
+// Widget البطاقات (DashboardCard)
 // ---------------------------------------------------------------------------
 class _DashboardCard extends StatelessWidget {
   final String title;
@@ -1036,8 +686,7 @@ class _DashboardCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final bool isVertical; // هل البطاقة عمودية؟
-  final double? height; // إمكانية تحديد ارتفاع ثابت
+  final bool isVertical;
 
   const _DashboardCard({
     required this.title,
@@ -1046,128 +695,101 @@ class _DashboardCard extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.isVertical = false,
-    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: height, // استخدام الارتفاع إذا تم تحديده
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: isVertical
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(icon, color: color, size: 30),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: color.withOpacity(0.1), width: 1),
+        ),
+        child: isVertical
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 32, color: color),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
                       ),
-                      const SizedBox(height: 10),
-                      // استخدام FittedBox لمنع خروج النص
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              )
+            : Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, size: 28, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
                           title,
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'Cairo',
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 4),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
+                        if (subtitle != null)
+                          Text(
                             subtitle!,
                             style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                              fontFamily: 'Cairo',
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                        ),
                       ],
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(icon, color: color, size: 28),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // استخدام FittedBox هنا أيضاً
-                            FittedBox(
-                              alignment: Alignment.centerRight,
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                title,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Cairo',
-                                ),
-                              ),
-                            ),
-                            if (subtitle != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                subtitle!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[600],
-                                  fontFamily: 'Cairo',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 14,
-                        color: Colors.grey[400],
-                      ),
-                    ],
+                    ),
                   ),
-          ),
-        ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
       ),
     );
   }
