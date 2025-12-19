@@ -340,6 +340,7 @@ class AdminDashboard extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
+            // تأكد أن ويدجت _DashboardCard موجودة في ملفك (في الأسفل)
             _DashboardCard(
               title: "الدخول لتطبيقي الخاص",
               subtitle: "إدارة منتجاتي وبياناتي",
@@ -355,14 +356,14 @@ class AdminDashboard extends StatelessWidget {
             const SizedBox(height: 20),
             _DashboardCard(
               title: "إدارة المستخدمين",
-              subtitle: "إنشاء حسابات للموظفين الجدد",
-              icon: Icons.person_add,
+              subtitle: "إنشاء حسابات وتحديد الصلاحيات",
+              icon: Icons.manage_accounts,
               color: Colors.purple.shade700,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const CreateUserScreen(),
+                    builder: (context) => const ManageUsersScreen(),
                   ),
                 );
               },
@@ -375,7 +376,7 @@ class AdminDashboard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة إنشاء مستخدم جديد
+// شاشة إنشاء مستخدم جديد (معدلة لمسار accounts)
 // ---------------------------------------------------------------------------
 class CreateUserScreen extends StatefulWidget {
   const CreateUserScreen({super.key});
@@ -387,6 +388,7 @@ class CreateUserScreen extends StatefulWidget {
 class _CreateUserScreenState extends State<CreateUserScreen> {
   final _newUsernameController = TextEditingController();
   final _newPasswordController = TextEditingController();
+  bool _isLoading = false;
 
   void _createNewUser() async {
     String username = _newUsernameController.text.trim();
@@ -394,23 +396,47 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 
     if (username.isEmpty || password.isEmpty) return;
 
-    if (username == "مؤمل") {
+    // التحقق من اسم المدير (تأكد أن دالة _isAdmin موجودة في ملفك أو استخدم الشرط المباشر)
+    if (username.contains("مؤمل") ||
+        username.contains("مءمل") ||
+        username == "2002") {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("لا يمكن تكرار اسم المدير")));
       return;
     }
 
-    await FirebaseDatabase.instance.ref('accounts/$username').set({
-      'password': password,
-      'created_at': ServerValue.timestamp,
-    });
+    setState(() => _isLoading = true);
 
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("تم إنشاء الحساب بنجاح")));
-      Navigator.pop(context);
+    try {
+      // ✅ التغيير هنا: الحفظ في accounts مباشرة باستخدام الاسم كمفتاح
+      await FirebaseDatabase.instance.ref('accounts/$username').set({
+        'password': password,
+        'created_at': ServerValue.timestamp,
+        // إضافة هيكل الصلاحيات الافتراضي (الكل مغلق false)
+        'permissions': {
+          'p_manage': false, // إدارة المنتجات
+          'p_calc_gram': false, // حاسبة الغرامات
+          'p_calc_price': false, // حاسبة الأسعار
+          'p_medical': false, // الخلطات العلاجية
+          'p_spices': false, // خلطات البهارات
+          'p_ai': false, // الذكاء الاصطناعي
+        },
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("تم إنشاء الحساب")));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -425,22 +451,26 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
             TextField(
               controller: _newUsernameController,
               decoration: const InputDecoration(
-                labelText: "اسم المستخدم الجديد",
+                labelText: "اسم المستخدم",
+                prefixIcon: Icon(Icons.person),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _newPasswordController,
-              decoration: const InputDecoration(labelText: "كلمة المرور"),
+              decoration: const InputDecoration(
+                labelText: "كلمة المرور",
+                prefixIcon: Icon(Icons.lock),
+              ),
             ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: _createNewUser,
+                onPressed: _isLoading ? null : _createNewUser,
                 icon: const Icon(Icons.save),
-                label: const Text("حفظ الحساب"),
+                label: Text(_isLoading ? "جاري الحفظ..." : "حفظ الحساب"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple.shade700,
                   foregroundColor: Colors.white,
@@ -455,7 +485,185 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// الشاشة الرئيسية (HomeScreen) - التعديل النهائي (حاسبات عمودية)
+// شاشة إدارة الموظفين (تقرأ من accounts)
+// ---------------------------------------------------------------------------
+class ManageUsersScreen extends StatefulWidget {
+  const ManageUsersScreen({super.key});
+
+  @override
+  State<ManageUsersScreen> createState() => _ManageUsersScreenState();
+}
+
+class _ManageUsersScreenState extends State<ManageUsersScreen> {
+  // خريطة الصلاحيات وأسمائها
+  static final Map<String, String> _permissionsMap = {
+    'p_manage': 'إدارة كافة المنتجات',
+    'p_calc_gram': 'حاسبة الغرامات',
+    'p_calc_price': 'حاسبة الأسعار',
+    'p_medical': 'الخلطات العلاجية',
+    'p_spices': 'خلطات البهارات',
+    'p_ai': 'الموسوعة الذكية',
+  };
+
+  // حذف المستخدم
+  void _deleteUser(String key) {
+    // شرط الحماية البسيط للمدير
+    if (key.contains("مؤمل") || key.contains("مءمل")) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("لا يمكن حذف المدير!")));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("تأكيد الحذف"),
+        content: Text("حذف الموظف $key؟"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("إلغاء"),
+          ),
+          TextButton(
+            onPressed: () {
+              // ✅ التغيير هنا: الحذف من accounts
+              FirebaseDatabase.instance.ref('accounts/$key').remove();
+              Navigator.pop(ctx);
+            },
+            child: const Text("حذف", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // تعديل الصلاحيات
+  void _editPermissions(String key, Map<dynamic, dynamic>? currentData) {
+    Map<String, bool> currentPerms = {};
+    // جلب الصلاحيات القديمة إن وجدت
+    if (currentData != null && currentData['permissions'] != null) {
+      final perms = Map<String, dynamic>.from(currentData['permissions']);
+      perms.forEach((k, v) => currentPerms[k] = v as bool);
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: Text("صلاحيات: $key"),
+          content: SingleChildScrollView(
+            child: Column(
+              children: _permissionsMap.keys.map((pKey) {
+                return CheckboxListTile(
+                  title: Text(_permissionsMap[pKey]!),
+                  value: currentPerms[pKey] ?? false, // إذا لم توجد تعتبر false
+                  activeColor: Colors.purple,
+                  onChanged: (val) {
+                    setStateDialog(() => currentPerms[pKey] = val!);
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                // ✅ التغيير هنا: تحديث الصلاحيات داخل حساب المستخدم
+                FirebaseDatabase.instance
+                    .ref('accounts/$key/permissions')
+                    .update(currentPerms);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("تم تحديث الصلاحيات")),
+                );
+              },
+              child: const Text("حفظ"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("إدارة الموظفين"),
+        backgroundColor: Colors.purple.shade700,
+        foregroundColor: Colors.white,
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.purple,
+        child: const Icon(Icons.add, color: Colors.white),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (c) => const CreateUserScreen()),
+        ),
+      ),
+      // ✅ التغيير هنا: الاستماع لمسار accounts
+      body: StreamBuilder(
+        stream: FirebaseDatabase.instance.ref('accounts').onValue,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return const Center(child: Text("حدث خطأ"));
+          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+            return const Center(child: Text("لا يوجد موظفين حالياً"));
+          }
+
+          final rawData = snapshot.data!.snapshot.value;
+          List<Map<String, dynamic>> usersList = [];
+
+          if (rawData is Map) {
+            rawData.forEach((key, value) {
+              final valMap = Map<String, dynamic>.from(value as Map);
+              // استثناء المدير من القائمة
+              if (!key.contains("مؤمل") && !key.contains("مءمل")) {
+                usersList.add({
+                  "key": key, // الاسم هو المفتاح في حالتك (مثل "بيت")
+                  "password": valMap['password'] ?? "***",
+                  "permissions": valMap['permissions'],
+                });
+              }
+            });
+          }
+
+          return ListView.builder(
+            itemCount: usersList.length,
+            itemBuilder: (context, index) {
+              final user = usersList[index];
+              return Card(
+                elevation: 3,
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                child: ListTile(
+                  leading: const CircleAvatar(child: Icon(Icons.person)),
+                  title: Text(user['key']), // عرض الاسم
+                  subtitle: Text("الرمز: ${user['password']}"),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.vpn_key, color: Colors.orange),
+                        onPressed: () => _editPermissions(user['key'], user),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _deleteUser(user['key']),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// الشاشة الرئيسية (HomeScreen) - مصححة لتعمل مع accounts
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -472,250 +680,298 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
+  // دالة للتحقق من الصلاحية والتوجيه
+  void _checkPermissionAndNavigate(
+    BuildContext context,
+    Map<dynamic, dynamic>? permissions,
+    String permKey,
+    Widget page,
+  ) {
+    // المدير العام (مؤمل) لديه صلاحية دائماً
+    if (currentUser.contains("مؤمل") ||
+        currentUser.contains("مءمل") ||
+        currentUser == "2002") {
+      Navigator.push(context, MaterialPageRoute(builder: (c) => page));
+      return;
+    }
+
+    bool isAllowed = false;
+    if (permissions != null && permissions[permKey] == true) {
+      isAllowed = true;
+    }
+
+    if (isAllowed) {
+      Navigator.push(context, MaterialPageRoute(builder: (c) => page));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("عذراً، للدخول لهذا القسم عليك الاشتراك ومراسلة الدعم"),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: Text(
-          "لوحة التحكم ($currentUser)",
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontFamily: 'Cairo',
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF00897B),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => _logout(context),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // === قسم الإدارة العامة ===
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8.0),
-                        child: Text(
-                          "الإدارة العامة",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black54,
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
-                      ),
-                      _DashboardCard(
-                        title: "إدارة كافة المنتجات",
-                        subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
-                        icon: Icons.settings_applications,
-                        color: Colors.red.shade700,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (c) =>
-                                  const MixturesListScreen(type: 'all'),
-                            ),
-                          );
-                        },
-                      ),
+    // ✅ التصحيح هنا: القراءة من 'accounts' مباشرة باستخدام currentUser كمفتاح
+    return StreamBuilder(
+      stream: FirebaseDatabase.instance
+          .ref()
+          .child('accounts') // كان users
+          .child(currentUser) // الدخول المباشر للمستخدم
+          .onValue,
+      builder: (context, snapshot) {
+        // تجهيز متغير الصلاحيات
+        Map<dynamic, dynamic>? myPermissions;
 
-                      const SizedBox(height: 24),
+        // استخراج الصلاحيات إذا وجدت البيانات
+        if (snapshot.hasData && snapshot.data!.snapshot.value != null) {
+          final data = Map<String, dynamic>.from(
+            snapshot.data!.snapshot.value as Map,
+          );
+          myPermissions = data['permissions'];
+        }
 
-                      // === قسم أدوات الحساب (تم التعديل: أصبح عمودياً) ===
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8.0),
-                        child: Text(
-                          "أدوات الحساب",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black54,
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _DashboardCard(
-                              title: "حاسبة الغرامات",
-                              icon: Icons.scale,
-                              color: Colors.blue.shade600,
-                              isVertical: true, // ✅ أصبحت عمودية (الأيقونة فوق)
-                              height:
-                                  150, // ✅ زيادة الارتفاع ليناسب الشكل الجديد
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (c) => const GramCalculatorPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _DashboardCard(
-                              title: "حاسبة الأسعار",
-                              icon: Icons.calculate,
-                              color: Colors.indigo.shade600,
-                              isVertical: true, // ✅ أصبحت عمودية (الأيقونة فوق)
-                              height: 150, // ✅ زيادة الارتفاع
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (c) =>
-                                        const QuickOrderCalculator(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // === قسم الأقسام ===
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8.0),
-                        child: Text(
-                          "إضافة وعرض حسب القسم",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black54,
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _DashboardCard(
-                              title: "الخلطات العلاجية",
-                              subtitle: "طب بديل",
-                              icon: Icons.medical_services_outlined,
-                              color: const Color(0xFF00897B),
-                              isVertical: true,
-                              height: 150,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (c) => const MixturesListScreen(
-                                      type: 'medical',
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _DashboardCard(
-                              title: "خلطات البهارات",
-                              subtitle: "توابل ونكهات",
-                              icon: Icons.soup_kitchen_outlined,
-                              color: const Color(0xFFFF8F00),
-                              isVertical: true,
-                              height: 150,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (c) =>
-                                        const MixturesListScreen(type: 'spice'),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // === قسم الذكاء الاصطناعي ===
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8.0),
-                        child: Text(
-                          "ذكاء اصطناعي",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black54,
-                            fontFamily: 'Cairo',
-                          ),
-                        ),
-                      ),
-                      _DashboardCard(
-                        title: "الموسوعة الذكية (Gemini)",
-                        subtitle: "معلومات فورية عن أي عشبة",
-                        icon: Icons.psychology,
-                        color: Colors.purple.shade600,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (c) => const SmartHerbAssistant(),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
+        return Scaffold(
+          backgroundColor: Colors.grey[100],
+          appBar: AppBar(
+            title: Text(
+              "لوحة التحكم ($currentUser)",
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                fontFamily: 'Cairo',
               ),
-
-              // === الحقوق ===
-              Container(
-                padding: const EdgeInsets.only(top: 10),
-                width: double.infinity,
-                child: Column(
-                  children: const [
-                    Text(
-                      "جميع الحقوق محفوظة لعطارة بيت العطار",
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        fontFamily: 'Cairo',
-                      ),
-                    ),
-                    Text(
-                      "تم برمجة التطبيق بواسطة kratossysttems",
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey,
-                        fontFamily: 'Cairo',
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            centerTitle: true,
+            backgroundColor: const Color(0xFF00897B),
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout, color: Colors.white),
+                onPressed: () => _logout(context),
               ),
             ],
           ),
-        ),
-      ),
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // === قسم الإدارة العامة ===
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              "الإدارة العامة",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ),
+                          _DashboardCard(
+                            title: "إدارة كافة المنتجات",
+                            subtitle: "عرض، تعديل، وحذف",
+                            icon: Icons.settings_applications,
+                            color: Colors.red.shade700,
+                            onTap: () {
+                              _checkPermissionAndNavigate(
+                                context,
+                                myPermissions,
+                                'p_manage',
+                                const MixturesListScreen(type: 'all'),
+                              );
+                            },
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // === قسم أدوات الحساب ===
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              "أدوات الحساب",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _DashboardCard(
+                                  title: "حاسبة الغرامات",
+                                  icon: Icons.scale,
+                                  color: Colors.blue.shade600,
+                                  isVertical: true,
+                                  height: 150,
+                                  onTap: () {
+                                    _checkPermissionAndNavigate(
+                                      context,
+                                      myPermissions,
+                                      'p_calc_gram',
+                                      const GramCalculatorPage(),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _DashboardCard(
+                                  title: "حاسبة الأسعار",
+                                  icon: Icons.calculate,
+                                  color: Colors.indigo.shade600,
+                                  isVertical: true,
+                                  height: 150,
+                                  onTap: () {
+                                    _checkPermissionAndNavigate(
+                                      context,
+                                      myPermissions,
+                                      'p_calc_price',
+                                      const QuickOrderCalculator(),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // === قسم الأقسام ===
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              "إضافة وعرض حسب القسم",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _DashboardCard(
+                                  title: "الخلطات العلاجية",
+                                  subtitle: "طب بديل",
+                                  icon: Icons.medical_services_outlined,
+                                  color: const Color(0xFF00897B),
+                                  isVertical: true,
+                                  height: 150,
+                                  onTap: () {
+                                    _checkPermissionAndNavigate(
+                                      context,
+                                      myPermissions,
+                                      'p_medical',
+                                      const MixturesListScreen(type: 'medical'),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _DashboardCard(
+                                  title: "خلطات البهارات",
+                                  subtitle: "توابل ونكهات",
+                                  icon: Icons.soup_kitchen_outlined,
+                                  color: const Color(0xFFFF8F00),
+                                  isVertical: true,
+                                  height: 150,
+                                  onTap: () {
+                                    _checkPermissionAndNavigate(
+                                      context,
+                                      myPermissions,
+                                      'p_spices',
+                                      const MixturesListScreen(type: 'spice'),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // === قسم الذكاء الاصطناعي ===
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              "ذكاء اصطناعي",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                          ),
+                          _DashboardCard(
+                            title: "الموسوعة الذكية (Gemini)",
+                            subtitle: "معلومات فورية عن أي عشبة",
+                            icon: Icons.psychology,
+                            color: Colors.purple.shade600,
+                            onTap: () {
+                              _checkPermissionAndNavigate(
+                                context,
+                                myPermissions,
+                                'p_ai',
+                                const SmartHerbAssistant(),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // === الحقوق ===
+                  Container(
+                    padding: const EdgeInsets.only(top: 10),
+                    width: double.infinity,
+                    child: Column(
+                      children: const [
+                        Text(
+                          "جميع الحقوق محفوظة لعطارة بيت العطار",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                        Text(
+                          "تم برمجة التطبيق بواسطة kratossysttems",
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
