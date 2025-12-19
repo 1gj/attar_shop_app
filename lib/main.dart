@@ -455,7 +455,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// الشاشة الرئيسية (HomeScreen)
+// الشاشة الرئيسية (HomeScreen) - التعديل النهائي (حاسبات عمودية)
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -482,6 +482,7 @@ class HomeScreen extends StatelessWidget {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
+            fontFamily: 'Cairo',
           ),
         ),
         centerTitle: true,
@@ -489,190 +490,230 @@ class HomeScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => _logout(context),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8.0),
-                      child: Text(
-                        "الإدارة العامة",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                    _DashboardCard(
-                      title: "إدارة كافة المنتجات",
-                      subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
-                      icon: Icons.settings_applications,
-                      color: Colors.red.shade700,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const MixturesListScreen(type: 'all'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 16.0),
-                      child: Text(
-                        "أدوات الحساب",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _DashboardCard(
-                            title: "حاسبة الغرامات",
-                            icon: Icons.scale,
-                            color: Colors.blue.shade600,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const GramCalculatorPage(),
-                              ),
-                            ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // === قسم الإدارة العامة ===
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                          "الإدارة العامة",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                            fontFamily: 'Cairo',
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DashboardCard(
-                            title: "حاسبة الأسعار",
-                            icon: Icons.calculate,
-                            color: Colors.indigo.shade600,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const QuickOrderCalculator(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 16.0),
-                      child: Text(
-                        "إضافة وعرض حسب القسم",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
                       ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _DashboardCard(
-                            title: "الخلطات العلاجية",
-                            subtitle: "طب بديل",
-                            icon: Icons.medical_services_outlined,
-                            color: const Color(0xFF00897B),
-                            isVertical: true,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const MixturesListScreen(type: 'medical'),
-                              ),
+                      _DashboardCard(
+                        title: "إدارة كافة المنتجات",
+                        subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
+                        icon: Icons.settings_applications,
+                        color: Colors.red.shade700,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (c) =>
+                                  const MixturesListScreen(type: 'all'),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DashboardCard(
-                            title: "خلطات البهارات",
-                            subtitle: "توابل ونكهات",
-                            icon: Icons.soup_kitchen_outlined,
-                            color: const Color(0xFFFF8F00),
-                            isVertical: true,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const MixturesListScreen(type: 'spice'),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                          );
+                        },
+                      ),
 
-                    // --- قسم الذكاء الاصطناعي ---
-                    const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 16.0),
-                      child: Text(
-                        "ذكاء اصطناعي",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
+                      const SizedBox(height: 24),
+
+                      // === قسم أدوات الحساب (تم التعديل: أصبح عمودياً) ===
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                          "أدوات الحساب",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                            fontFamily: 'Cairo',
+                          ),
                         ),
                       ),
-                    ),
-                    _DashboardCard(
-                      title: "الموسوعة الذكية (Gemini)",
-                      subtitle: "معلومات فورية عن أي عشبة",
-                      icon: Icons.psychology,
-                      color: Colors.purple.shade600,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SmartHerbAssistant(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DashboardCard(
+                              title: "حاسبة الغرامات",
+                              icon: Icons.scale,
+                              color: Colors.blue.shade600,
+                              isVertical: true, // ✅ أصبحت عمودية (الأيقونة فوق)
+                              height:
+                                  150, // ✅ زيادة الارتفاع ليناسب الشكل الجديد
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (c) => const GramCalculatorPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _DashboardCard(
+                              title: "حاسبة الأسعار",
+                              icon: Icons.calculate,
+                              color: Colors.indigo.shade600,
+                              isVertical: true, // ✅ أصبحت عمودية (الأيقونة فوق)
+                              height: 150, // ✅ زيادة الارتفاع
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (c) =>
+                                        const QuickOrderCalculator(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // === قسم الأقسام ===
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                          "إضافة وعرض حسب القسم",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                            fontFamily: 'Cairo',
+                          ),
                         ),
                       ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DashboardCard(
+                              title: "الخلطات العلاجية",
+                              subtitle: "طب بديل",
+                              icon: Icons.medical_services_outlined,
+                              color: const Color(0xFF00897B),
+                              isVertical: true,
+                              height: 150,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (c) => const MixturesListScreen(
+                                      type: 'medical',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _DashboardCard(
+                              title: "خلطات البهارات",
+                              subtitle: "توابل ونكهات",
+                              icon: Icons.soup_kitchen_outlined,
+                              color: const Color(0xFFFF8F00),
+                              isVertical: true,
+                              height: 150,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (c) =>
+                                        const MixturesListScreen(type: 'spice'),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // === قسم الذكاء الاصطناعي ===
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                          "ذكاء اصطناعي",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                            fontFamily: 'Cairo',
+                          ),
+                        ),
+                      ),
+                      _DashboardCard(
+                        title: "الموسوعة الذكية (Gemini)",
+                        subtitle: "معلومات فورية عن أي عشبة",
+                        icon: Icons.psychology,
+                        color: Colors.purple.shade600,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (c) => const SmartHerbAssistant(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+
+              // === الحقوق ===
+              Container(
+                padding: const EdgeInsets.only(top: 10),
+                width: double.infinity,
+                child: Column(
+                  children: const [
+                    Text(
+                      "جميع الحقوق محفوظة لعطارة بيت العطار",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        fontFamily: 'Cairo',
+                      ),
                     ),
-                    const SizedBox(height: 20),
+                    Text(
+                      "تم برمجة التطبيق بواسطة kratossysttems",
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey,
+                        fontFamily: 'Cairo',
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.only(top: 10),
-              width: double.infinity,
-              child: Column(
-                children: const [
-                  Text(
-                    "جميع الحقوق محفوظة لعطارة بيت العطار",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  Text(
-                    "تم برمجة التطبيق بواسطة kratossysttems",
-                    style: TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -680,7 +721,7 @@ class HomeScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Widget البطاقات (DashboardCard)
+// الكلاس المساعد للبطاقات (معدل ليدعم التصميم الجديد)
 // ---------------------------------------------------------------------------
 class _DashboardCard extends StatelessWidget {
   final String title;
@@ -688,7 +729,8 @@ class _DashboardCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final bool isVertical;
+  final bool isVertical; // هل البطاقة عمودية؟
+  final double? height; // إمكانية تحديد ارتفاع ثابت
 
   const _DashboardCard({
     required this.title,
@@ -697,101 +739,128 @@ class _DashboardCard extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.isVertical = false,
+    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(color: color.withOpacity(0.1), width: 1),
-        ),
-        child: isVertical
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, size: 32, color: color),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+    return Container(
+      height: height, // استخدام الارتفاع إذا تم تحديده
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: isVertical
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, color: color, size: 30),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ],
-              )
-            : Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, size: 28, color: color),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
+                      const SizedBox(height: 10),
+                      // استخدام FittedBox لمنع خروج النص
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
                           title,
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
+                            fontFamily: 'Cairo',
                           ),
+                          textAlign: TextAlign.center,
                         ),
-                        if (subtitle != null)
-                          Text(
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 4),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
                             subtitle!,
                             style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              fontFamily: 'Cairo',
                             ),
+                            textAlign: TextAlign.center,
                           ),
+                        ),
                       ],
-                    ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: color, size: 28),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // استخدام FittedBox هنا أيضاً
+                            FittedBox(
+                              alignment: Alignment.centerRight,
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Cairo',
+                                ),
+                              ),
+                            ),
+                            if (subtitle != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                subtitle!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                  fontFamily: 'Cairo',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 14,
+                        color: Colors.grey[400],
+                      ),
+                    ],
                   ),
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
-                ],
-              ),
+          ),
+        ),
       ),
     );
   }
