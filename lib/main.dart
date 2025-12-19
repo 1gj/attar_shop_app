@@ -304,7 +304,191 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 // ---------------------------------------------------------------------------
-// شاشة المدير (مؤمل)
+// شاشة عرض الإشعارات (جديدة - للمستخدمين)
+// ---------------------------------------------------------------------------
+class UserNotificationsScreen extends StatelessWidget {
+  const UserNotificationsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("تنبيهات الإدارة"),
+        backgroundColor: const Color(0xFF00897B),
+        foregroundColor: Colors.white,
+      ),
+      body: StreamBuilder(
+        // جلب آخر 20 إشعار
+        stream: FirebaseDatabase.instance
+            .ref('notifications')
+            .limitToLast(20)
+            .onValue,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.notifications_none, size: 80, color: Colors.grey),
+                  SizedBox(height: 10),
+                  Text("لا توجد إشعارات جديدة"),
+                ],
+              ),
+            );
+          }
+
+          final rawData = snapshot.data!.snapshot.value as Map;
+          List<Map<String, dynamic>> messages = [];
+
+          rawData.forEach((key, value) {
+            messages.add(Map<String, dynamic>.from(value));
+          });
+
+          // ترتيب من الأحدث للأقدم
+          messages.sort(
+            (a, b) => (b['timestamp'] ?? 0).compareTo(a['timestamp'] ?? 0),
+          );
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(10),
+            itemCount: messages.length,
+            itemBuilder: (context, index) {
+              final msg = messages[index];
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Colors.redAccent,
+                    child: Icon(Icons.priority_high, color: Colors.white),
+                  ),
+                  title: Text(
+                    msg['body'] ?? "",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  subtitle: Text(
+                    "بواسطة: ${msg['sender'] ?? 'الإدارة'}",
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// شاشة إرسال الإشعارات (جديدة - للمدير فقط)
+// ---------------------------------------------------------------------------
+class SendNotificationScreen extends StatefulWidget {
+  const SendNotificationScreen({super.key});
+
+  @override
+  State<SendNotificationScreen> createState() => _SendNotificationScreenState();
+}
+
+class _SendNotificationScreenState extends State<SendNotificationScreen> {
+  final _messageController = TextEditingController();
+  bool _isSending = false;
+
+  void _sendNotification() async {
+    if (_messageController.text.trim().isEmpty) return;
+
+    setState(() => _isSending = true);
+
+    try {
+      // إنشاء عقدة جديدة في notifications
+      final ref = FirebaseDatabase.instance.ref('notifications').push();
+      await ref.set({
+        'body': _messageController.text.trim(),
+        'sender': 'الإدارة (مؤمل)',
+        'timestamp': ServerValue.timestamp,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("تم نشر الإشعار لجميع العطارين")),
+        );
+        _messageController.clear();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("خطأ: $e")));
+      }
+    } finally {
+      setState(() => _isSending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("إرسال إشعار عام"),
+        backgroundColor: Colors.red.shade700,
+        foregroundColor: Colors.white,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            const Icon(Icons.notifications_active, size: 80, color: Colors.red),
+            const SizedBox(height: 20),
+            const Text(
+              "اكتب رسالة ستظهر لجميع مستخدمي التطبيق فوراً",
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            TextField(
+              controller: _messageController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: "مثال: يرجى الانتباه لوجود تحديث جديد...",
+                labelText: "نص التنبيه",
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 30,
+              child: ElevatedButton.icon(
+                onPressed: _isSending ? null : _sendNotification,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.send),
+                label: _isSending
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("نشر الإشعار"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// شاشة المدير (مؤمل) - محدثة
 // ---------------------------------------------------------------------------
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -337,38 +521,174 @@ class AdminDashboard extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            _DashboardCard(
-              title: "الدخول لتطبيقي الخاص",
-              subtitle: "إدارة منتجاتي وبياناتي",
-              icon: Icons.store_mall_directory,
-              color: const Color(0xFF00897B),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            _DashboardCard(
-              title: "إدارة المستخدمين",
-              subtitle: "إنشاء حسابات للموظفين الجدد",
-              icon: Icons.person_add,
-              color: Colors.purple.shade700,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CreateUserScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              // زر الدخول للتطبيق كـ مستخدم عادي
+              _DashboardCard(
+                title: "الدخول لتطبيقي الخاص",
+                subtitle: "إدارة منتجاتي وبياناتي",
+                icon: Icons.store_mall_directory,
+                color: const Color(0xFF00897B),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              // زر إدارة الحسابات (حذف/تعديل)
+              _DashboardCard(
+                title: "إدارة الحسابات",
+                subtitle: "حذف الحسابات وتعديل الصلاحيات",
+                icon: Icons.manage_accounts,
+                color: Colors.orange.shade800,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ManageUsersScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              // زر إرسال الإشعارات (جديد)
+              _DashboardCard(
+                title: "إرسال إشعارات",
+                subtitle: "إرسال تنبيهات لكل المستخدمين",
+                icon: Icons.notifications_active,
+                color: Colors.red.shade700,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SendNotificationScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// شاشة إدارة المستخدمين (حذف وإضافة) - محدثة
+// ---------------------------------------------------------------------------
+class ManageUsersScreen extends StatelessWidget {
+  const ManageUsersScreen({super.key});
+
+  // دالة الحذف
+  void _deleteUser(BuildContext context, String key) {
+    if (key == "مؤمل") {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("لا يمكن حذف حساب المدير الرئيسي!")),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("تأكيد الحذف"),
+        content: Text(
+          "هل أنت متأكد من حذف حساب ($key)؟\nسيتم حذف بيانات الدخول والبيانات الخاصة.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("إلغاء"),
+          ),
+          TextButton(
+            onPressed: () {
+              // 1. حذف من accounts (بيانات الدخول)
+              FirebaseDatabase.instance.ref('accounts/$key').remove();
+              // 2. حذف من users_data (بيانات المستخدم الخاصة كالخلطات)
+              FirebaseDatabase.instance.ref('users_data/$key').remove();
+
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("تم حذف الحساب والبيانات بنجاح")),
+              );
+            },
+            child: const Text("حذف نهائي", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("إدارة الحسابات"),
+        backgroundColor: Colors.orange.shade800,
+        foregroundColor: Colors.white,
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.orange.shade800,
+        child: const Icon(Icons.person_add, color: Colors.white),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const CreateUserScreen()),
+        ),
+      ),
+      body: StreamBuilder(
+        stream: FirebaseDatabase.instance.ref('accounts').onValue,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return const Center(child: Text("حدث خطأ"));
+          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+            return const Center(child: Text("لا يوجد حسابات حالياً"));
+          }
+
+          final rawData = snapshot.data!.snapshot.value;
+          List<Map<String, dynamic>> users = [];
+
+          if (rawData is Map) {
+            rawData.forEach((key, value) {
+              final userData = Map<String, dynamic>.from(value as Map);
+              users.add({'key': key, 'password': userData['password']});
+            });
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: users.length,
+            itemBuilder: (context, index) {
+              final user = users[index];
+              return Card(
+                elevation: 3,
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: user['key'] == "مؤمل"
+                        ? Colors.purple
+                        : Colors.teal,
+                    child: const Icon(Icons.person, color: Colors.white),
+                  ),
+                  title: Text(
+                    user['key'],
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text("الرمز: ${user['password']}"),
+                  trailing: user['key'] == "مؤمل"
+                      ? null // إخفاء الحذف للمدير
+                      : IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _deleteUser(context, user['key']),
+                        ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -455,7 +775,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// الشاشة الرئيسية (HomeScreen)
+// الشاشة الرئيسية (HomeScreen) - تدعم تسجيل الخروج التلقائي عند الحذف
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -474,205 +794,236 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: Text(
-          "لوحة التحكم ($currentUser)",
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF00897B),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _logout(context),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8.0),
-                      child: Text(
-                        "الإدارة العامة",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                    _DashboardCard(
-                      title: "إدارة كافة المنتجات",
-                      subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
-                      icon: Icons.settings_applications,
-                      color: Colors.red.shade700,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const MixturesListScreen(type: 'all'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 16.0),
-                      child: Text(
-                        "أدوات الحساب",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
+    // ✅ هذا هو التعديل: نستمع لحالة حساب المستخدم الحالي
+    return StreamBuilder(
+      stream: FirebaseDatabase.instance.ref('accounts/$currentUser').onValue,
+      builder: (context, snapshot) {
+        // إذا وصلت بيانات وكانت القيمة null، فهذا يعني أن الحساب تم حذفه
+        if (snapshot.hasData && snapshot.data!.snapshot.value == null) {
+          // نستخدم addPostFrameCallback لتجنب حدوث خطأ أثناء بناء الواجهة
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _logout(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("تم حذف حسابك من قبل الإدارة"),
+                backgroundColor: Colors.red,
+              ),
+            );
+          });
+          // عرض شاشة تحميل مؤقتة حتى يتم الخروج
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-                    // ✅ التعديل هنا: جعل البطاقات تظهر واحدة تلو الأخرى عمودياً
-                    _DashboardCard(
-                      title: "حاسبة الغرامات",
-                      icon: Icons.scale,
-                      color: Colors.blue.shade600,
-                      // يمكنك إزالة isVertical: true لتصبح الأيقونة بجانب النص
-                      // أو إبقاءها لتكون الأيقونة فوق النص (حسب رغبتك)
-                      // سأجعلها أفقية (أيقونة بجانب النص) لتناسب العرض الكامل
-                      isVertical: false,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const GramCalculatorPage(),
-                        ),
-                      ),
+        // ✅ إذا الحساب موجود، اعرض الواجهة الطبيعية
+        return Scaffold(
+          backgroundColor: Colors.grey[100],
+          appBar: AppBar(
+            title: Text(
+              "لوحة التحكم ($currentUser)",
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            centerTitle: true,
+            backgroundColor: const Color(0xFF00897B),
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const UserNotificationsScreen(),
                     ),
-                    const SizedBox(height: 12), // مسافة بين البطاقتين
-                    _DashboardCard(
-                      title: "حاسبة الأسعار",
-                      icon: Icons.calculate,
-                      color: Colors.indigo.shade600,
-                      isVertical: false,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const QuickOrderCalculator(),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 16.0),
-                      child: Text(
-                        "إضافة وعرض حسب القسم",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                    Row(
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout, color: Colors.white),
+                onPressed: () => _logout(context),
+              ),
+            ],
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _DashboardCard(
-                            title: "الخلطات العلاجية",
-                            subtitle: "طب بديل",
-                            icon: Icons.medical_services_outlined,
-                            color: const Color(0xFF00897B),
-                            isVertical: true,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const MixturesListScreen(type: 'medical'),
-                              ),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8.0),
+                          child: Text(
+                            "الإدارة العامة",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DashboardCard(
-                            title: "خلطات البهارات",
-                            subtitle: "توابل ونكهات",
-                            icon: Icons.soup_kitchen_outlined,
-                            color: const Color(0xFFFF8F00),
-                            isVertical: true,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const MixturesListScreen(type: 'spice'),
-                              ),
+                        _DashboardCard(
+                          title: "إدارة كافة المنتجات",
+                          subtitle: "عرض، تعديل، وحذف (بهارات وعلاجات)",
+                          icon: Icons.settings_applications,
+                          color: Colors.red.shade700,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const MixturesListScreen(type: 'all'),
                             ),
                           ),
                         ),
+                        const SizedBox(height: 24),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 16.0),
+                          child: Text(
+                            "أدوات الحساب",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+                        _DashboardCard(
+                          title: "حاسبة الغرامات",
+                          icon: Icons.scale,
+                          color: Colors.blue.shade600,
+                          isVertical: false,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const GramCalculatorPage(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _DashboardCard(
+                          title: "حاسبة الأسعار",
+                          icon: Icons.calculate,
+                          color: Colors.indigo.shade600,
+                          isVertical: false,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const QuickOrderCalculator(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 16.0),
+                          child: Text(
+                            "إضافة وعرض حسب القسم",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DashboardCard(
+                                title: "الخلطات العلاجية",
+                                subtitle: "طب بديل",
+                                icon: Icons.medical_services_outlined,
+                                color: const Color(0xFF00897B),
+                                isVertical: true,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const MixturesListScreen(
+                                          type: 'medical',
+                                        ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _DashboardCard(
+                                title: "خلطات البهارات",
+                                subtitle: "توابل ونكهات",
+                                icon: Icons.soup_kitchen_outlined,
+                                color: const Color(0xFFFF8F00),
+                                isVertical: true,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const MixturesListScreen(type: 'spice'),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 16.0),
+                          child: Text(
+                            "ذكاء اصطناعي",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+                        _DashboardCard(
+                          title: "الموسوعة الذكية (Gemini)",
+                          subtitle: "معلومات فورية عن أي عشبة",
+                          icon: Icons.psychology,
+                          color: Colors.purple.shade600,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SmartHerbAssistant(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
                       ],
                     ),
-
-                    // --- قسم الذكاء الاصطناعي ---
-                    const SizedBox(height: 24),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 16.0),
-                      child: Text(
-                        "ذكاء اصطناعي",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                    _DashboardCard(
-                      title: "الموسوعة الذكية (Gemini)",
-                      subtitle: "معلومات فورية عن أي عشبة",
-                      icon: Icons.psychology,
-                      color: Colors.purple.shade600,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SmartHerbAssistant(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.only(top: 10),
-              width: double.infinity,
-              child: Column(
-                children: const [
-                  Text(
-                    "جميع الحقوق محفوظة لعطارة بيت العطار",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
+                Container(
+                  padding: const EdgeInsets.only(top: 10),
+                  width: double.infinity,
+                  child: Column(
+                    children: const [
+                      Text(
+                        "جميع الحقوق محفوظة لعطارة بيت العطار",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      Text(
+                        "تم برمجة التطبيق بواسطة kratossysttems",
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ],
                   ),
-                  Text(
-                    "تم برمجة التطبيق بواسطة kratossysttems",
-                    style: TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1769,6 +2120,9 @@ class MixtureDetailScreen extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// نافذة حاسبة الكميات (Modal) - تكبير خطوط النتائج والقائمة
+// ---------------------------------------------------------------------------
 class MixtureCalculatorModal extends StatefulWidget {
   final List<dynamic> ingredients;
   final Color themeColor;
@@ -1930,6 +2284,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
             child: TextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 labelText: _tabController.index == 0
                     ? "الوزن المطلوب (غرام)"
@@ -1950,6 +2305,8 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
             ),
           ),
           const SizedBox(height: 10),
+
+          // --- ملخص النتائج (الخط الكبير) ---
           if (_calculatedIngredients.isNotEmpty)
             Container(
               padding: const EdgeInsets.all(16),
@@ -1967,20 +2324,20 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                     children: [
                       const Text(
                         "الوزن الصافي",
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 14),
                       ),
                       Text(
                         "${_calculatedTotalWeight.toStringAsFixed(0)} غرام",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                          fontSize: 28, // خط كبير جداً للمجموع
                           color: widget.themeColor,
                         ),
                       ),
                     ],
                   ),
                   Container(
-                    height: 30,
+                    height: 40,
                     width: 1,
                     color: Colors.grey.withOpacity(0.3),
                   ),
@@ -1989,13 +2346,13 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                     children: [
                       const Text(
                         "السعر النهائي",
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 14),
                       ),
                       Text(
                         "${_calculatedTotalPrice.toStringAsFixed(0)} د.ع",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                          fontSize: 28, // خط كبير جداً للمجموع
                           color: widget.themeColor,
                         ),
                       ),
@@ -2004,6 +2361,8 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                 ],
               ),
             ),
+
+          // --- قائمة المواد (تم تكبير الخط هنا) ---
           Expanded(
             child: _calculatedIngredients.isEmpty
                 ? Center(
@@ -2018,28 +2377,53 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                     itemBuilder: (context, index) {
                       final item = _calculatedIngredients[index];
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(
+                          bottom: 12,
+                        ), // مسافة أكبر بين العناصر
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           border: Border(
-                            bottom: BorderSide(color: Colors.grey.shade100),
+                            bottom: BorderSide(color: Colors.grey.shade200),
                           ),
                         ),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          title: Text(
-                            item['name'],
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            "${(item['grams'] as double).toStringAsFixed(1)} غرام",
-                            style: TextStyle(color: widget.themeColor),
-                          ),
-                          trailing: Text(
-                            "${(item['cost'] as double).toStringAsFixed(0)} د.ع",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // 1. اسم المادة
+                            Expanded(
+                              child: Text(
+                                item['name'],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20, // ✅ تكبير خط الاسم
+                                ),
+                              ),
+                            ),
+
+                            // 2. الوزن والسعر
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  "${(item['grams'] as double).toStringAsFixed(1)} غرام",
+                                  style: TextStyle(
+                                    color: widget.themeColor,
+                                    fontSize: 18, // ✅ تكبير خط الوزن
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  "${(item['cost'] as double).toStringAsFixed(0)} د.ع",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18, // ✅ تكبير خط السعر
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       );
                     },
