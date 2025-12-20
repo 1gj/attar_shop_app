@@ -775,7 +775,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// الشاشة الرئيسية (HomeScreen) - تدعم تسجيل الخروج التلقائي عند الحذف
+// الشاشة الرئيسية (HomeScreen) - مصححة لتستثني المدير من الحذف التلقائي
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -794,13 +794,16 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ هذا هو التعديل: نستمع لحالة حساب المستخدم الحالي
     return StreamBuilder(
-      stream: FirebaseDatabase.instance.ref('accounts/$currentUser').onValue,
+      // ✅ التعديل الأول: إذا كان المدير، لا نراقب قاعدة البيانات
+      stream: (currentUser == "مؤمل")
+          ? null
+          : FirebaseDatabase.instance.ref('accounts/$currentUser').onValue,
       builder: (context, snapshot) {
-        // إذا وصلت بيانات وكانت القيمة null، فهذا يعني أن الحساب تم حذفه
-        if (snapshot.hasData && snapshot.data!.snapshot.value == null) {
-          // نستخدم addPostFrameCallback لتجنب حدوث خطأ أثناء بناء الواجهة
+        // ✅ التعديل الثاني: التحقق من الحذف يتم فقط للمستخدم العادي
+        if (currentUser != "مؤمل" &&
+            snapshot.hasData &&
+            snapshot.data!.snapshot.value == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _logout(context);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -810,13 +813,12 @@ class HomeScreen extends StatelessWidget {
               ),
             );
           });
-          // عرض شاشة تحميل مؤقتة حتى يتم الخروج
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // ✅ إذا الحساب موجود، اعرض الواجهة الطبيعية
+        // واجهة التطبيق الطبيعية
         return Scaffold(
           backgroundColor: Colors.grey[100],
           appBar: AppBar(
@@ -1922,7 +1924,9 @@ class MixtureDetailScreen extends StatelessWidget {
         onPressed: () {
           showModalBottomSheet(
             context: context,
-            isScrollControlled: true,
+            isScrollControlled: true, // ضروري للسماح بالارتفاع الكامل
+            useSafeArea:
+                true, // ✅ الإضافة الجديدة: تحمي المحتوى من الاختفاء تحت شريط الحالة
             backgroundColor: Colors.transparent,
             builder: (context) => MixtureCalculatorModal(
               ingredients: ingredients,
@@ -2121,7 +2125,7 @@ class MixtureDetailScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// نافذة حاسبة الكميات (Modal) - تكبير خطوط النتائج والقائمة
+// نافذة حاسبة الكميات (Modal) - ملء الشاشة (Full Screen)
 // ---------------------------------------------------------------------------
 class MixtureCalculatorModal extends StatefulWidget {
   final List<dynamic> ingredients;
@@ -2229,14 +2233,16 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ التعديل هنا: جعل الحاوية تأخذ ارتفاع الشاشة بالكامل
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height, // ارتفاع كامل
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
+          // مقبض السحب
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 12),
             width: 50,
@@ -2246,15 +2252,33 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-          Text(
-            "حاسبة: ${widget.mixtureName}",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: widget.themeColor,
+
+          // زر الإغلاق + العنوان
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                Text(
+                  "حاسبة: ${widget.mixtureName}",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: widget.themeColor,
+                  ),
+                ),
+                const SizedBox(width: 48), // مسافة لموازنة زر الإغلاق
+              ],
             ),
           ),
-          const SizedBox(height: 10),
+
+          const SizedBox(height: 2),
+
+          // التبويبات
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -2266,7 +2290,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                 controller: _tabController,
                 indicator: BoxDecoration(
                   color: widget.themeColor,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 labelColor: Colors.white,
                 unselectedLabelColor: Colors.grey,
@@ -2278,13 +2302,16 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
               ),
             ),
           ),
-          const SizedBox(height: 20),
+
+          const SizedBox(height: 10),
+
+          // حقل الإدخال
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: TextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 labelText: _tabController.index == 0
                     ? "الوزن المطلوب (غرام)"
@@ -2304,12 +2331,14 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
               ),
             ),
           ),
+
           const SizedBox(height: 10),
 
-          // --- ملخص النتائج (الخط الكبير) ---
+          // --- ملخص النتائج (تم تصغير الحجم) ---
           if (_calculatedIngredients.isNotEmpty)
             Container(
-              padding: const EdgeInsets.all(16),
+              // تقليل الهوامش الداخلية (كان 16)
+              padding: const EdgeInsets.symmetric(vertical: 1, horizontal: 6),
               margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               decoration: BoxDecoration(
                 color: widget.themeColor.withOpacity(0.1),
@@ -2324,21 +2353,23 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                     children: [
                       const Text(
                         "الوزن الصافي",
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                          fontSize: 10,
+                        ), // تصغير خط العنوان (كان 14)
                       ),
                       Text(
                         "${_calculatedTotalWeight.toStringAsFixed(0)} غرام",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 28, // خط كبير جداً للمجموع
+                          fontSize: 15, // تصغير الرقم (كان 28)
                           color: widget.themeColor,
                         ),
                       ),
                     ],
                   ),
                   Container(
-                    height: 40,
-                    width: 1,
+                    height: 30, // تصغير ارتفاع الخط الفاصل (كان 40)
+                    width: 0.1,
                     color: Colors.grey.withOpacity(0.3),
                   ),
                   Column(
@@ -2346,13 +2377,13 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                     children: [
                       const Text(
                         "السعر النهائي",
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 12), // تصغير خط العنوان
                       ),
                       Text(
                         "${_calculatedTotalPrice.toStringAsFixed(0)} د.ع",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 28, // خط كبير جداً للمجموع
+                          fontSize: 22, // تصغير الرقم (كان 28)
                           color: widget.themeColor,
                         ),
                       ),
@@ -2362,7 +2393,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
               ),
             ),
 
-          // --- قائمة المواد (تم تكبير الخط هنا) ---
+          // قائمة المواد
           Expanded(
             child: _calculatedIngredients.isEmpty
                 ? Center(
@@ -2377,10 +2408,8 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                     itemBuilder: (context, index) {
                       final item = _calculatedIngredients[index];
                       return Container(
-                        margin: const EdgeInsets.only(
-                          bottom: 12,
-                        ), // مسافة أكبر بين العناصر
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        margin: const EdgeInsets.only(bottom: 0),
+                        padding: const EdgeInsets.symmetric(vertical: 0.2),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           border: Border(
@@ -2390,18 +2419,15 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // 1. اسم المادة
                             Expanded(
                               child: Text(
                                 item['name'],
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 20, // ✅ تكبير خط الاسم
+                                  fontSize: 20,
                                 ),
                               ),
                             ),
-
-                            // 2. الوزن والسعر
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
@@ -2409,7 +2435,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                                   "${(item['grams'] as double).toStringAsFixed(1)} غرام",
                                   style: TextStyle(
                                     color: widget.themeColor,
-                                    fontSize: 18, // ✅ تكبير خط الوزن
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -2417,7 +2443,7 @@ class _MixtureCalculatorModalState extends State<MixtureCalculatorModal>
                                   "${(item['cost'] as double).toStringAsFixed(0)} د.ع",
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 18, // ✅ تكبير خط السعر
+                                    fontSize: 18,
                                     color: Colors.black54,
                                   ),
                                 ),
