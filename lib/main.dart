@@ -9,7 +9,6 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'dart:convert'; // ✅ يحل مشكلة jsonEncode
 import 'package:http/http.dart' as http; // ✅ يحل مشكلة http
-import 'package:flutter/services.dart'; // 👈 أضف هذا السطر مع الـ imports
 
 // ===========================================================================
 
