@@ -18,10 +18,22 @@ String currentUser = "";
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 👇👇 أضف هذا السطر هنا بالضبط لإخفاء شريط الحالة والأزرار السفلية 👇👇
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  // تفعيل وضع الحافة للحافة لكي يظهر الشريط العلوي كجزء من التطبيق
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  // تخصيص الألوان: الشريط العلوي شفاف، والشريط السفلي أسود
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent, // شفاف لكي يظهر المحتوى خلفه
+      statusBarIconBrightness:
+          Brightness.dark, // أيقونات داكنة (لأن الخلفية فاتحة)
+      systemNavigationBarColor: Colors.black, // ✅ الشريط السفلي أسود بالكامل
+      systemNavigationBarIconBrightness: Brightness.light, // أيقونات بيضاء
+    ),
+  );
 
   await Firebase.initializeApp();
+
   final prefs = await SharedPreferences.getInstance();
   final savedUser = prefs.getString('saved_user');
   Widget startScreen = const LoginPage();
@@ -48,30 +60,16 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'بيت العطار',
       theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00897B),
-          secondary: const Color(0xFFFF8F00),
-          background: const Color(0xFFF5F5F5),
-        ),
-        fontFamily: 'Segoe UI',
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF00897B), width: 2),
-          ),
-        ),
+        // ... (نفس الثيم السابق)
       ),
+
+      // ✅ التعديل هنا:
+      builder: (context, child) {
+        // top: false -> يسمح للتطبيق بالظهور خلف شريط الحالة العلوي
+        // bottom: true -> يمنع التطبيق من الظهور خلف شريط الأزرار السفلي (ليبقى أسود)
+        return SafeArea(top: false, bottom: true, child: child!);
+      },
+
       home: startScreen,
     );
   }
