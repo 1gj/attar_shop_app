@@ -6,6 +6,10 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'dart:convert'; // ✅ يحل مشكلة jsonEncode
+import 'package:http/http.dart' as http; // ✅ يحل مشكلة http
+
 // ===========================================================================
 
 String currentUser = "";
@@ -151,7 +155,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _launchWhatsApp() async {
-    const phoneNumber = "9647736860085";
+    const phoneNumber = "9647726860085";
     final appUrl = Uri.parse("whatsapp://send?phone=$phoneNumber");
     final webUrl = Uri.parse("https://wa.me/$phoneNumber");
 
@@ -389,8 +393,14 @@ class UserNotificationsScreen extends StatelessWidget {
   }
 }
 
+// أضف هذا الاستدعاء في أعلى الملف مع باقي الـ imports
+
+// ... باقي الكود ...
+
+// تأكد من إضافة هذا السطر في أعلى ملف main.dart مع باقي الـ imports:
+
 // ---------------------------------------------------------------------------
-// شاشة إرسال الإشعارات (جديدة - للمدير فقط)
+// شاشة إرسال الإشعارات (محدثة لتعمل مع FCM API V1 باستخدام حساب الخدمة)
 // ---------------------------------------------------------------------------
 class SendNotificationScreen extends StatefulWidget {
   const SendNotificationScreen({super.key});
@@ -403,26 +413,129 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   final _messageController = TextEditingController();
   bool _isSending = false;
 
-  void _sendNotification() async {
+  // ✅ بيانات الحساب الخدمي (Service Account) المحدثة
+  final String _projectId = "attaraapp";
+  final String _clientEmail =
+      "firebase-adminsdk-fbsvc@attaraapp.iam.gserviceaccount.com";
+  // تم استخدام ''' للنصوص متعددة الأسطر لضمان التنسيق الصحيح للمفتاح
+  final String _privateKey = '''
+-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCf/ni8IeiBc0AY
+EKITOt7q36z6NVQ+VefqP8DHi8md2i4vFu1UekIkVxEcn3I73PkukdaNvDOhfhcN
+DyuptCsQcYLZgoQXQfnN5/kFJkizkUgknccBLYFx7+WzzVYi57UYwCqgr76muE2V
+dx9LUxYz5+qGfp/GVcfXA60Y4WFhbQGiXei8iKjE9MVZQi3ee/UeZd4y6vWGhm2y
+wn4CmvzJLI3P7iKa9f1aZO8U9GyuMWIjRSbVL0//aGGYKukzbAvi+bgqLiaJkvec
+R5Tw7+77g5KsgjbMlee8Ma4lDCswf/DkB2PYthy17+kegEZf8wSAcL/gTWc8AI9N
+as2+Y0vxAgMBAAECggEAAoTwpytkWdEkDxpIR7kndwdqNenmpNEi5NvCYroAekYh
+WvU3gTsoGmJNwbeVMPIKBpn+CNm6mTuZrBIDNV8XMav3PCAmSZH3bPmO604heq9f
+gBEaco9XgJZpwD7WsS0YxfYfrbZQEEK/w6ozpv1c0K4sEZhXQSRLEGdiykJL74tl
+bfbJ86YLHjf7i+d8k4Zzd+F/iD98CcaUHcwPxHNWlwDbFDXzsYp4w+x7oQ/BWnMB
+jFVf+YhrgYjYtx/8Md6qvnOZdhb2ByJw1k/59HRJELYVUtmqJnzp9ArXozpuUohm
+oqIAMXgCHEiMhTjKom1JoKZmDsCEaC7W/TY3eflqwQKBgQDdFqT9uLB4EwH8cPGN
+lFxdexPcWr+1i33ZD7aXQEJlg+GzIyTOdSyvlow9mZViwa+MSrvXMnTHcOCIowZM
+OhDVqVHl1XWJuv5BCmlLvNmjnXhxg6/ZqS9HZXrbz38DnpR6OiUF05C5kMaJ9kIB
+133K6txSoQ/5vbcFRnNf9EICEQKBgQC5QiAIlQT+fRA6r9mD2fJctfxZ1Ae++GOz
+lW5EQjYZT1+cHQAX+0ifhTVtl5jxgAKy9YyC4ASqkxg0a6lQfXqF+2MQtIRSpqt1
+yowePgCFcA3JozTznj4ctL4oONHuKSBVYfDMcL0YPN1YTzTImQ6FG1CsGI2byrG6
+Y3JCsPzL4QKBgQCKZ3mkSDFZCfUtVnsxOZZVAw6c3Ma03P1MnFSe/SBTsqrhXPfW
+s23lAicLDRGCwGOoPMS45CJNFHHLt9rib1tIlnXpnqa1MTWn+9+NBU1t6s+SqHC2
+nv41AOdXod8OogCrP6kbq6UnNeXESkBqLL/X/w0sQR3iJwzjJYZmpF+KMQKBgQCz
+DPsC8GxUPrGp1v3m1oXNH0LX2vrlkxJhpkJdjJTW34Ur0Eef5gkpzEh4NHXoq21w
+Y6y7bSJ1bheNyqRpG+2IgxAbPC1L6LR88xd7vzcnwMZCpQ/viXjEq9fB7jDP+0W5
+4CAop6nLPEA+Msd0PaHv+hd9TXnIIh6mY6kyVfbuYQKBgQC6SMjN2fZMGhqzoMfS
+dTyyvq8ji73u0mK+oyyCVUgIFQqHAQg58+XZh/HyG9M8wbB4tQ3ceYHd27C93/ox
++NDLSE+sOzZBtEIjMacoJ+SDGXDiKxRl7ogGt1YWk+MjaAR2MDPHQLNu4azZqfJN
+BAGwlAmfqqPxZX6+gIhCXtLRdQ==
+-----END PRIVATE KEY-----
+''';
+
+  // دالة للحصول على Access Token
+  Future<String?> _getAccessToken() async {
+    try {
+      final accountCredentials = auth.ServiceAccountCredentials.fromJson({
+        "private_key": _privateKey,
+        "client_email": _clientEmail,
+        "project_id": _projectId,
+        "type": "service_account",
+      });
+
+      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+      final client = await auth.clientViaServiceAccount(
+        accountCredentials,
+        scopes,
+      );
+      return client.credentials.accessToken.data;
+    } catch (e) {
+      debugPrint("خطأ في توليد التوكن: $e");
+      return null;
+    }
+  }
+
+  Future<void> _sendNotification() async {
     if (_messageController.text.trim().isEmpty) return;
 
     setState(() => _isSending = true);
 
     try {
-      // إنشاء عقدة جديدة في notifications
-      final ref = FirebaseDatabase.instance.ref('notifications').push();
-      await ref.set({
+      // 1. حفظ في قاعدة البيانات (للعرض الداخلي في التطبيق)
+      await FirebaseDatabase.instance.ref('notifications').push().set({
         'body': _messageController.text.trim(),
         'sender': 'الإدارة (مؤمل)',
         'timestamp': ServerValue.timestamp,
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم نشر الإشعار لجميع العطارين")),
-        );
-        _messageController.clear();
+      // 2. الحصول على توكن المصادقة الجديد (V1)
+      final String? accessToken = await _getAccessToken();
+
+      if (accessToken == null) {
+        throw "فشل في المصادقة مع Google API - تأكد من صلاحيات ملف الخدمة";
       }
+
+      // 3. إرسال الإشعار باستخدام FCM V1 API
+      final response = await http.post(
+        Uri.parse(
+          'https://fcm.googleapis.com/v1/projects/$_projectId/messages:send',
+        ),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          'message': {
+            'topic': 'all', // يرسل لجميع المشتركين في topic 'all'
+            'notification': {
+              'title': 'تنبيه من بيت العطار',
+              'body': _messageController.text.trim(),
+            },
+            'android': {
+              'notification': {
+                'sound': 'default',
+                'priority': 'high', // لضمان الظهور
+                'channel_id':
+                    'high_importance_channel', // نفس ID القناة في main
+              },
+            },
+            'data': {
+              'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+              'status': 'done',
+              'id': '1',
+              'body': _messageController.text.trim(),
+            },
+          },
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("تم الإرسال بنجاح (V1)")),
+          );
+        }
+      } else {
+        throw "خطأ من السيرفر (${response.statusCode}): ${response.body}";
+      }
+
+      _messageController.clear();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -438,7 +551,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("إرسال إشعار عام"),
+        title: const Text("إرسال إشعار (V1)"),
         backgroundColor: Colors.red.shade700,
         foregroundColor: Colors.white,
       ),
@@ -449,17 +562,22 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
             const Icon(Icons.notifications_active, size: 80, color: Colors.red),
             const SizedBox(height: 20),
             const Text(
-              "اكتب رسالة ستظهر لجميع مستخدمي التطبيق فوراً",
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+              "نظام الإشعارات المطور (V1)",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              "اكتب رسالة لتصل لجميع الهواتف فوراً",
               textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 30),
             TextField(
               controller: _messageController,
               maxLines: 4,
               decoration: const InputDecoration(
-                hintText: "مثال: يرجى الانتباه لوجود تحديث جديد...",
-                labelText: "نص التنبيه",
+                hintText: "مثال: عرض خاص على الزعفران...",
+                labelText: "نص الإشعار",
                 alignLabelWithHint: true,
                 border: OutlineInputBorder(),
               ),
@@ -467,7 +585,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
-              height: 30,
+              height: 50,
               child: ElevatedButton.icon(
                 onPressed: _isSending ? null : _sendNotification,
                 style: ElevatedButton.styleFrom(
@@ -477,7 +595,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
                 icon: const Icon(Icons.send),
                 label: _isSending
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("نشر الإشعار"),
+                    : const Text("إرسال الآن"),
               ),
             ),
           ],
@@ -775,7 +893,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// الشاشة الرئيسية (HomeScreen) - مصححة لتستثني المدير من الحذف التلقائي
+// الشاشة الرئيسية (HomeScreen) - متجاوبة مع إضافة زر الدعم (واتساب)
 // ---------------------------------------------------------------------------
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -792,15 +910,38 @@ class HomeScreen extends StatelessWidget {
     }
   }
 
+  // ✅ دالة لفتح واتساب للدعم الفني
+  Future<void> _launchSupportWhatsApp(BuildContext context) async {
+    const phoneNumber = "9647726860085"; // رقم الدعم
+    final appUrl = Uri.parse("whatsapp://send?phone=$phoneNumber");
+    final webUrl = Uri.parse("https://wa.me/$phoneNumber");
+
+    try {
+      if (await canLaunchUrl(appUrl)) {
+        await launchUrl(appUrl);
+      } else {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("تعذر فتح الواتساب")));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // ✅ التحقق من حجم الشاشة
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isSmallScreen = screenWidth < 380;
+
     return StreamBuilder(
-      // ✅ التعديل الأول: إذا كان المدير، لا نراقب قاعدة البيانات
       stream: (currentUser == "مؤمل")
           ? null
           : FirebaseDatabase.instance.ref('accounts/$currentUser').onValue,
       builder: (context, snapshot) {
-        // ✅ التعديل الثاني: التحقق من الحذف يتم فقط للمستخدم العادي
         if (currentUser != "مؤمل" &&
             snapshot.hasData &&
             snapshot.data!.snapshot.value == null) {
@@ -818,7 +959,6 @@ class HomeScreen extends StatelessWidget {
           );
         }
 
-        // واجهة التطبيق الطبيعية
         return Scaffold(
           backgroundColor: Colors.grey[100],
           appBar: AppBar(
@@ -933,45 +1073,82 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _DashboardCard(
-                                title: "الخلطات العلاجية",
-                                subtitle: "طب بديل",
-                                icon: Icons.medical_services_outlined,
-                                color: const Color(0xFF00897B),
-                                isVertical: true,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const MixturesListScreen(
-                                          type: 'medical',
-                                        ),
+
+                        // القسم المتجاوب (الخلطات)
+                        if (isSmallScreen) ...[
+                          _DashboardCard(
+                            title: "الخلطات العلاجية",
+                            subtitle: "طب بديل",
+                            icon: Icons.medical_services_outlined,
+                            color: const Color(0xFF00897B),
+                            isVertical: false,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const MixturesListScreen(type: 'medical'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _DashboardCard(
+                            title: "خلطات البهارات",
+                            subtitle: "توابل ونكهات",
+                            icon: Icons.soup_kitchen_outlined,
+                            color: const Color(0xFFFF8F00),
+                            isVertical: false,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const MixturesListScreen(type: 'spice'),
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _DashboardCard(
+                                  title: "الخلطات العلاجية",
+                                  subtitle: "طب بديل",
+                                  icon: Icons.medical_services_outlined,
+                                  color: const Color(0xFF00897B),
+                                  isVertical: true,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const MixturesListScreen(
+                                            type: 'medical',
+                                          ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _DashboardCard(
-                                title: "خلطات البهارات",
-                                subtitle: "توابل ونكهات",
-                                icon: Icons.soup_kitchen_outlined,
-                                color: const Color(0xFFFF8F00),
-                                isVertical: true,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const MixturesListScreen(type: 'spice'),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _DashboardCard(
+                                  title: "خلطات البهارات",
+                                  subtitle: "توابل ونكهات",
+                                  icon: Icons.soup_kitchen_outlined,
+                                  color: const Color(0xFFFF8F00),
+                                  isVertical: true,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const MixturesListScreen(
+                                            type: 'spice',
+                                          ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
+
                         const SizedBox(height: 24),
                         const Padding(
                           padding: EdgeInsets.only(bottom: 16.0),
@@ -985,7 +1162,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         _DashboardCard(
-                          title: "الموسوعة الذكية (Gemini)",
+                          title: "الموسوعة الذكية ",
                           subtitle: "معلومات فورية عن أي عشبة",
                           icon: Icons.psychology,
                           color: Colors.purple.shade600,
@@ -996,6 +1173,29 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                         ),
+
+                        const SizedBox(height: 24),
+                        // ✅ زر الدعم الفني الجديد
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 16.0),
+                          child: Text(
+                            "الدعم والمساعدة",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ),
+                        _DashboardCard(
+                          title: "تواصل مع الدعم الفني",
+                          subtitle: "راسلنا على واتساب لأي مشكلة",
+                          icon: Icons.support_agent,
+                          color: Colors.green.shade600,
+                          isVertical: false, // جعلته أفقياً ليأخذ مساحة
+                          onTap: () => _launchSupportWhatsApp(context),
+                        ),
+
                         const SizedBox(height: 20),
                       ],
                     ),
